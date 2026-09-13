@@ -1,0 +1,1530 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>От линейной модели к MLP</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#F4F5F2; --surface:#FFFFFF; --surface-2:#E9ECE6; --surface-3:#DDE2DA;
+  --ink:#171B1C; --ink-2:#4B5553; --ink-3:#84908C; --line:#D5DBD5; --line-2:#BFC8C1;
+  --accent:#3F4FB5; --accent-ink:#FFFFFF; --accent-soft:#E4E7F8;
+  --warm:#B4521C; --warm-soft:#F9E7DC;
+  --ok:#1D7A4E; --ok-soft:#DDF2E5; --bad:#B4382C; --bad-soft:#F9E1DE;
+  --fwd:#0A9486; --fwd-soft:#D9F1EE; --bwd:#D2500F; --bwd-soft:#FBE5D8;
+  --ca:#2F6BE6; --cb:#D9337A; --ca-soft:#DCE6FB; --cb-soft:#FADCE8;
+  --grid:#E3E7E1; --code-bg:#F7F8F5;
+  --shadow:0 1px 2px rgba(23,27,28,.06), 0 10px 26px -14px rgba(23,27,28,.22);
+  --radius:10px;
+  --font-body:"Public Sans","Segoe UI",Roboto,Arial,sans-serif;
+  --font-head:"Newsreader",Georgia,"Times New Roman",serif;
+  --font-mono:"JetBrains Mono","SFMono-Regular",Consolas,"Liberation Mono",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#121615; --surface:#1B2120; --surface-2:#242C2A; --surface-3:#2E3835;
+    --ink:#ECEFEC; --ink-2:#AEB8B4; --ink-3:#78847F; --line:#2E3836; --line-2:#3C4845;
+    --accent:#A3ADF3; --accent-ink:#0F1330; --accent-soft:#252C55;
+    --warm:#EF9560; --warm-soft:#3B2417;
+    --ok:#56C68F; --ok-soft:#173526; --bad:#F07E72; --bad-soft:#3D1F1C;
+    --fwd:#1AA595; --fwd-soft:#143432; --bwd:#DE6A22; --bwd-soft:#3B2214;
+    --ca:#4A8BEA; --cb:#E0589A; --ca-soft:#1B2C4A; --cb-soft:#3E1F30;
+    --grid:#252D2B; --code-bg:#151A19;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 12px 28px -14px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#121615; --surface:#1B2120; --surface-2:#242C2A; --surface-3:#2E3835;
+  --ink:#ECEFEC; --ink-2:#AEB8B4; --ink-3:#78847F; --line:#2E3836; --line-2:#3C4845;
+  --accent:#A3ADF3; --accent-ink:#0F1330; --accent-soft:#252C55;
+  --warm:#EF9560; --warm-soft:#3B2417;
+  --ok:#56C68F; --ok-soft:#173526; --bad:#F07E72; --bad-soft:#3D1F1C;
+  --fwd:#1AA595; --fwd-soft:#143432; --bwd:#DE6A22; --bwd-soft:#3B2214;
+  --ca:#4A8BEA; --cb:#E0589A; --ca-soft:#1B2C4A; --cb-soft:#3E1F30;
+  --grid:#252D2B; --code-bg:#151A19;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 12px 28px -14px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box}
+html{font-size:18px; scroll-behavior:smooth}
+:root{--measure:980px}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} *{transition:none!important; animation:none!important} }
+body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-body); font-size:1rem; line-height:1.55; -webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+h1,h2,h3{font-family:var(--font-head); font-weight:500; line-height:1.15; margin:0; text-wrap:balance; letter-spacing:-.005em}
+h1{font-size:2.4rem} h2{font-size:1.9rem} h3{font-size:1.25rem; margin-top:1.5rem}
+h4{font-size:.95rem; font-weight:600; margin:1rem 0 .3rem}
+p{margin:.6rem 0}
+code,pre,.mono{font-family:var(--font-mono); font-variant-numeric:tabular-nums}
+code{font-size:.88em; background:var(--surface-2); padding:.05em .35em; border-radius:4px}
+pre{background:var(--code-bg); border:1px solid var(--line); border-radius:var(--radius); padding:.9rem 1rem; overflow-x:auto; font-size:.84rem; line-height:1.5}
+pre code{background:none; padding:0; font-size:inherit}
+ul,ol{padding-left:1.3rem} li{margin:.25rem 0}
+table{border-collapse:collapse; width:100%; font-size:.92rem}
+th,td{text-align:left; padding:.5rem .65rem; border-bottom:1px solid var(--line); vertical-align:top}
+th{font-weight:600; color:var(--ink-2); font-size:.78rem; text-transform:uppercase; letter-spacing:.05em}
+td.num,th.num{text-align:right; font-family:var(--font-mono); white-space:nowrap}
+.tablewrap{overflow-x:auto}
+button,select,input{font:inherit; color:inherit}
+button{cursor:pointer; background:var(--surface); border:1px solid var(--line-2); border-radius:8px; padding:.4rem .85rem; font-size:.88rem; font-weight:500}
+button:hover{border-color:var(--accent)}
+button:disabled{opacity:.45; cursor:default}
+button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+button.primary{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+button.ghost{background:transparent}
+button[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent)}
+select,input[type=number],input[type=text]{background:var(--surface); border:1px solid var(--line-2); border-radius:8px; padding:.35rem .5rem}
+input[type=number]{width:5.5em; font-family:var(--font-mono); font-size:.9rem}
+input[type=range]{width:100%; accent-color:var(--accent)}
+label{font-size:.84rem; color:var(--ink-2)}
+
+/* math */
+.m{font-family:var(--font-head); font-style:italic; font-size:1.06em; white-space:nowrap}
+.m b{font-style:normal; font-weight:600}
+.m sub,.m sup{font-style:normal; font-size:.68em; line-height:0}
+.m .up{font-style:normal}
+.eq{font-family:var(--font-head); font-style:italic; font-size:1.25rem; text-align:center; margin:1rem 0; color:var(--ink); line-height:1.5}
+.eq .up{font-style:normal}
+.eq sub,.eq sup{font-style:normal; font-size:.65em}
+.eq .frac{display:inline-flex; flex-direction:column; vertical-align:middle; text-align:center; line-height:1.15; font-size:.92em; margin:0 .15em}
+.eq .frac > span:first-child{border-bottom:1px solid currentColor; padding:0 .2em}
+.m .frac{display:inline-flex; flex-direction:column; vertical-align:middle; text-align:center; line-height:1.1; font-size:.9em; margin:0 .1em}
+.m .frac > span:first-child{border-bottom:1px solid currentColor; padding:0 .15em}
+
+/* top bar */
+.topbar{position:sticky; top:0; z-index:20; background:color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter:blur(8px); border-bottom:1px solid var(--line)}
+.topbar-in{max-width:1180px; margin:0 auto; padding:.5rem 1.2rem; display:flex; align-items:center; gap:1rem}
+.brand{font-family:var(--font-head); font-size:1rem; white-space:nowrap; color:var(--ink-2)}
+.brand b{color:var(--ink); font-weight:600}
+.chips{display:flex; gap:.35rem; overflow-x:auto; flex:1; scrollbar-width:none; padding:.15rem 0}
+.chips::-webkit-scrollbar{display:none}
+.chip{white-space:nowrap; font-size:.76rem; padding:.25rem .6rem; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--ink-2); text-decoration:none}
+.chip.active{border-color:var(--accent); color:var(--accent); background:var(--accent-soft)}
+.tools{display:flex; gap:.35rem}
+.tools button{font-size:.76rem; padding:.3rem .6rem}
+
+/* sections */
+main{max-width:1180px; margin:0 auto; padding:0 1.2rem 6rem}
+.sec{padding:3.2rem 0 2.2rem; border-bottom:1px solid var(--line)}
+.sec:last-child{border-bottom:0}
+.sec-head{max-width:var(--measure); margin-bottom:1.2rem}
+.lede{font-size:1.12rem; color:var(--ink-2); margin-top:.5rem}
+.prose{max-width:var(--measure)}
+.prose.wide{max-width:none}
+.cols{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:1.2rem 2.2rem}
+.hero{padding:3.5rem 0 3rem}
+.hero .eyebrow{font-family:var(--font-mono); font-size:.78rem; color:var(--ink-3); letter-spacing:.06em; text-transform:uppercase}
+.hero h1{margin:.5rem 0 .8rem; font-size:clamp(2.1rem,4.6vw,3.3rem)}
+.hero .lede{max-width:var(--measure)}
+.thesis{border-left:3px solid var(--accent); padding:.4rem 1rem; margin:1.2rem 0; font-family:var(--font-head); font-size:1.25rem; max-width:var(--measure)}
+.note{font-size:.9rem; color:var(--ink-2); border:1px dashed var(--line-2); border-radius:8px; padding:.5rem .8rem; margin:.8rem 0}
+.ask{background:var(--warm-soft); border-radius:8px; padding:.6rem .9rem; margin:.9rem 0; font-size:.95rem; max-width:var(--measure)}
+.ask b{color:var(--warm)}
+.kicker{font-size:.76rem; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-3); font-weight:600}
+.slot{color:var(--warm); font-style:italic}
+
+/* interactive stage */
+.stage{background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); padding:1.2rem 1.4rem; margin:1.4rem 0}
+.stage-head{display:flex; align-items:baseline; gap:.8rem; flex-wrap:wrap; margin-bottom:.6rem}
+.stage-head .tag{font-family:var(--font-mono); font-size:.7rem; color:var(--warm); background:var(--warm-soft); padding:.15rem .5rem; border-radius:4px; letter-spacing:.05em}
+.stage-head h3{margin:0; font-size:1.2rem}
+.stage-head .hint{color:var(--ink-2); font-size:.88rem; flex-basis:100%; margin:.2rem 0 0}
+.controls{display:flex; gap:.8rem 1.4rem; flex-wrap:wrap; align-items:end; margin:.6rem 0 .9rem}
+.ctl{display:flex; flex-direction:column; gap:.2rem; min-width:150px}
+.ctl.sm{min-width:110px}
+.ctl .v{font-family:var(--font-mono); font-size:.8rem; color:var(--ink)}
+.row{display:flex; gap:.6rem; flex-wrap:wrap; align-items:center}
+.stats{display:flex; gap:.6rem; flex-wrap:wrap; margin:.8rem 0}
+.stat{display:flex; flex-direction:column; gap:.1rem; padding:.55rem .9rem; background:var(--surface-2); border-radius:8px; min-width:130px}
+.stat .l{font-size:.72rem; color:var(--ink-2); text-transform:uppercase; letter-spacing:.05em}
+.stat .n{font-family:var(--font-mono); font-size:1.25rem; font-weight:500}
+.stat .s{font-size:.76rem; color:var(--ink-3)}
+.legend{display:flex; gap:.9rem; flex-wrap:wrap; font-size:.8rem; color:var(--ink-2); margin-top:.5rem}
+.legend i{display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:.35rem; vertical-align:-1px}
+.legend i.ln{height:2px; width:16px; vertical-align:3px; border-radius:1px}
+.pill{display:inline-block; font-size:.74rem; padding:.1rem .55rem; border-radius:999px; border:1px solid var(--line-2); color:var(--ink-2)}
+.pill.ok{background:var(--ok-soft); color:var(--ok); border-color:transparent}
+.pill.bad{background:var(--bad-soft); color:var(--bad); border-color:transparent}
+.pill.warn{background:var(--warm-soft); color:var(--warm); border-color:transparent}
+.pill.acc{background:var(--accent-soft); color:var(--accent); border-color:transparent}
+.pill.fwd{background:var(--fwd-soft); color:var(--fwd); border-color:transparent}
+.pill.bwd{background:var(--bwd-soft); color:var(--bwd); border-color:transparent}
+.two{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:1.2rem}
+.two.wide-left{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)}
+@media (max-width:860px){.two,.two.wide-left{grid-template-columns:1fr}}
+canvas.plot{width:100%; height:auto; display:block; border-radius:8px; background:var(--surface-2)}
+canvas.plot.click{cursor:crosshair}
+.card{background:var(--surface-2); border-radius:10px; padding:.8rem 1rem; font-size:.92rem}
+.card .k{font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-3); margin-bottom:.25rem}
+.card.fwd{border-left:3px solid var(--fwd)} .card.bwd{border-left:3px solid var(--bwd)}
+.cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:.8rem}
+.figure{margin:1rem 0}
+.figure svg{width:100%; max-width:680px; height:auto; display:block}
+.figure figcaption{font-size:.82rem; color:var(--ink-2); margin-top:.4rem}
+.svgtxt{fill:var(--ink-2); font-family:var(--font-body); font-size:12px}
+.svgtxt.m{font-family:var(--font-mono)}
+.svgtxt.h{font-family:var(--font-head); font-style:italic; font-size:14px; fill:var(--ink)}
+.svgline{stroke:var(--line-2)}
+
+/* dataset / class chips */
+.dsbtns button{padding:.3rem .6rem; font-size:.8rem}
+
+/* hidden-neuron gallery */
+.gallery{display:grid; grid-template-columns:repeat(auto-fill,minmax(88px,1fr)); gap:.5rem; margin-top:.6rem}
+.gcell{display:flex; flex-direction:column; gap:.2rem; align-items:center; cursor:pointer; border:1px solid transparent; border-radius:8px; padding:.3rem}
+.gcell canvas{width:100%; height:auto; border-radius:6px; background:var(--surface-2)}
+.gcell span{font-family:var(--font-mono); font-size:.7rem; color:var(--ink-3)}
+.gcell[aria-pressed="true"]{border-color:var(--accent); background:var(--accent-soft)}
+.gcell.dead span{color:var(--bad)}
+
+/* linear stack */
+.wmat{font-family:var(--font-mono); font-size:.82rem; background:var(--code-bg); border:1px solid var(--line); border-radius:8px; padding:.6rem .8rem; overflow-x:auto; white-space:pre; line-height:1.5}
+
+/* comp graph */
+.cg{display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); gap:1.2rem}
+@media (max-width:900px){.cg{grid-template-columns:1fr}}
+.cg svg,.cgs svg{width:100%; height:auto; display:block}
+.cgs .node rect,.cgs .node circle{fill:var(--surface); stroke:var(--line-2); stroke-width:1.5; transition:stroke .2s, fill .2s}
+.cgs .node text{font-family:var(--font-head); font-style:italic; font-size:15px; fill:var(--ink); text-anchor:middle}
+.cgs .node .val{font-family:var(--font-mono); font-style:normal; font-size:11px; fill:var(--fwd); text-anchor:middle}
+.cgs .node .grad{font-family:var(--font-mono); font-style:normal; font-size:11px; fill:var(--bwd); text-anchor:middle}
+.cgs .node .op{font-family:var(--font-mono); font-style:normal; font-size:10px; fill:var(--ink-3); text-anchor:middle}
+.cgs .edge{stroke:var(--line-2); stroke-width:1.6; fill:none; transition:stroke .2s, stroke-width .2s}
+.cgs .edge.f{stroke:var(--fwd); stroke-width:2.6}
+.cgs .edge.b{stroke:var(--bwd); stroke-width:2.6; stroke-dasharray:6 4}
+.cgs .node.cur rect,.cgs .node.cur circle{stroke:var(--accent); stroke-width:2.5; fill:var(--accent-soft)}
+.cgs .node.done-f rect,.cgs .node.done-f circle{stroke:var(--fwd)}
+.cgs .node.done-b rect,.cgs .node.done-b circle{stroke:var(--bwd)}
+.cgs .node.stored rect,.cgs .node.stored circle{fill:var(--fwd-soft)}
+.steplog{display:flex; flex-direction:column; gap:.3rem; max-height:330px; overflow:auto; font-size:.86rem}
+.steplog .st{display:grid; grid-template-columns:1.8rem 1fr; gap:.5rem; padding:.35rem .55rem; border-radius:6px; border:1px solid transparent}
+.steplog .st .i{font-family:var(--font-mono); font-size:.72rem; color:var(--ink-3)}
+.steplog .st.f{background:var(--fwd-soft)} .steplog .st.b{background:var(--bwd-soft)}
+.steplog .st.cur{border-color:var(--accent)}
+.steplog .st .m{white-space:normal}
+.stepinfo{background:var(--surface-2); border-radius:8px; padding:.7rem .9rem; font-size:.92rem; min-height:96px; margin-bottom:.8rem}
+.stepinfo .k{font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-3); margin-bottom:.2rem}
+
+/* layer bars */
+.lbars{display:flex; align-items:flex-end; gap:6px; height:180px; border-bottom:1px solid var(--line-2); padding:0 .2rem}
+.lbar{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; position:relative}
+.lbar i{display:block; width:100%; max-width:46px; background:var(--bwd); border-radius:4px 4px 0 0; transition:height .3s}
+.lbar b{font-family:var(--font-mono); font-size:.68rem; font-weight:400; color:var(--ink-2); position:absolute; top:-1.1rem; white-space:nowrap}
+.lbar b.lo{top:auto; bottom:2px; color:var(--ink-2)}
+.lbarlabels{display:flex; gap:6px; padding:.25rem .2rem 0}
+.lbarlabels span{flex:1; text-align:center; font-family:var(--font-mono); font-size:.7rem; color:var(--ink-3)}
+.axis-note{font-size:.76rem; color:var(--ink-3); margin-top:.3rem}
+
+/* stacked prose blocks, folds, lists of equations */
+.stack{display:flex; flex-direction:column; gap:.2rem}
+.stack > .prose{max-width:var(--measure)}
+.eq.list{display:flex; flex-wrap:wrap; justify-content:center; gap:.4rem 2.2rem}
+.eq.list > span{white-space:nowrap}
+details.fold{border:1px solid var(--line); border-radius:10px; padding:.5rem .9rem; margin:.8rem 0; background:var(--surface)}
+details.fold summary{cursor:pointer; font-weight:600; font-size:.92rem; color:var(--accent)}
+details.fold[open] summary{margin-bottom:.4rem}
+.ask .reveal{font-size:.76rem; padding:.15rem .55rem; margin-left:.4rem; vertical-align:1px}
+.ask .ans{display:block; margin-top:.4rem; padding-top:.4rem; border-top:1px dashed var(--line-2)}
+.bpgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:.6rem .9rem; margin-top:.6rem}
+.bpgrid .k{font-size:.78rem; color:var(--ink-3); margin-bottom:.2rem}
+.bpgrid .k sub{text-transform:none}
+.bpgrid input[type=number]{width:4.6em}
+.bpgrid .row{gap:.3rem; margin-bottom:.3rem}
+.quizgrid{display:flex; flex-direction:column; gap:.4rem}
+.quizgrid label{display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; font-size:.9rem; color:var(--ink)}
+.quizgrid input[type=number]{width:5em}
+.quizgrid input.ok{border-color:var(--ok); background:var(--ok-soft)}
+.quizgrid input.bad{border-color:var(--bad); background:var(--bad-soft)}
+.cgs .node .op{font-size:9px}
+
+/* course intro */
+.intro{display:flex; flex-direction:column; gap:1.6rem; max-width:980px}
+.qrcard{display:grid; grid-template-columns:150px 1fr; gap:1.2rem; align-items:center; background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:1rem 1.2rem; box-shadow:var(--shadow); max-width:640px}
+.qrcard .qr{background:#FFFFFF; color:#000000; border-radius:8px; padding:8px; line-height:0}
+.qrcard .qr svg{width:100%; height:auto; display:block}
+.qrcard .k{font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-3)}
+.qrcard p{font-size:.9rem; color:var(--ink-2); margin:.4rem 0 0}
+.biglink{font-family:var(--font-mono); font-size:1.05rem; word-break:break-all}
+@media (max-width:520px){.qrcard{grid-template-columns:1fr}}
+.team{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:.8rem}
+.person{display:flex; flex-direction:column; gap:.15rem; background:var(--surface-2); border-radius:10px; padding:.8rem 1rem; font-size:.9rem; color:var(--ink-2)}
+.person b{color:var(--ink); font-family:var(--font-head); font-size:1.15rem; font-weight:500}
+.person a{font-family:var(--font-mono); font-size:.85rem; text-decoration:none; margin-bottom:.2rem}
+.formula{font-family:var(--font-head); font-size:1.5rem; margin:.2rem 0 .9rem; font-variant-numeric:tabular-nums}
+.formula b{font-weight:600}
+
+/* misc */
+.steps{counter-reset:s; list-style:none; padding:0; margin:.8rem 0}
+.steps li{counter-increment:s; display:grid; grid-template-columns:2.2rem 1fr; gap:.6rem; padding:.55rem 0; border-top:1px solid var(--line)}
+.steps li::before{content:counter(s); font-family:var(--font-mono); color:var(--accent); font-size:1.1rem}
+.takeaway{background:var(--accent-soft); border-radius:12px; padding:1rem 1.2rem}
+.takeaway h3{margin-top:0}
+.alt{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:.8rem}
+.alt .card{display:flex; flex-direction:column; gap:.3rem}
+.alt .card .y{font-family:var(--font-mono); font-size:.72rem; color:var(--ink-3)}
+footer{max-width:1180px; margin:0 auto; padding:1rem 1.2rem 3rem; font-size:.8rem; color:var(--ink-3)}
+.teacher{display:none}
+body.teacher .teacher{display:block}
+
+/* presentation mode */
+body.present{font-size:1.08rem}
+html:has(body.present){scroll-snap-type:y proximity}
+body.present .sec{min-height:calc(100vh - 52px); scroll-snap-align:start; padding-top:2.5rem}
+body.present h2{font-size:2.3rem}
+body.present .stage{font-size:1rem}
+</style>
+</head>
+<body>
+<div class="topbar"><div class="topbar-in">
+  <div class="brand"><b>Глубинное обучение</b> · занятие 1</div>
+  <nav class="chips" id="chips" aria-label="Разделы"></nav>
+  <div class="tools"><button id="presentBtn" aria-pressed="false">Режим: прокрутка</button><button id="themeBtn">Тема: система</button></div>
+</div></div>
+
+<main>
+
+<section id="s0" class="sec hero" data-short="Начало">
+  <div class="eyebrow">Глубинное обучение · занятие 1</div>
+  <h1>От линейной модели к MLP: как сеть считает и как она учится</h1>
+  <p class="lede">Полносвязные сети, вычислительный граф и backpropagation. Всё, что здесь двигается, считается прямо в браузере — можно крутить руками.</p>
+  <div class="thesis">Если у нас уже есть линейная регрессия и градиентный спуск — что именно нового в нейросетях?</div>
+  <div class="prose">
+    <p class="note">Стрелки ← → листают разделы в режиме презентации. Этот же файл — раздатка: всё интерактивное работает без сети.</p>
+  </div>
+</section>
+
+<section id="s00" class="sec" data-short="О курсе">
+  <div class="sec-head">
+    <h2>О курсе</h2>
+    <p class="lede">Чат, преподаватели и как выставляется оценка.</p>
+  </div>
+  <div class="intro">
+    <div class="qrcard">
+      <div class="qr"><svg role="img" aria-label="QR-код: ссылка на чат курса в Telegram" width="100%" height="auto" class="segno"><path transform="scale(4)" class="qrline" stroke="currentColor" d="M2 2.5h7m4 0h3m2 0h3m1 0h1m1 0h7m-29 1h1m5 0h1m1 0h2m1 0h3m1 0h1m1 0h2m3 0h1m5 0h1m-29 1h1m1 0h3m1 0h1m1 0h2m4 0h1m3 0h3m1 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m3 0h2m2 0h1m1 0h2m1 0h1m2 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m3 0h2m1 0h2m2 0h1m1 0h1m2 0h1m1 0h3m1 0h1m-29 1h1m5 0h1m2 0h2m1 0h1m2 0h1m1 0h3m2 0h1m5 0h1m-29 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-20 1h2m1 0h1m1 0h1m2 0h3m-19 1h3m1 0h2m2 0h2m3 0h3m1 0h1m7 0h2m-28 1h3m4 0h1m1 0h1m1 0h3m6 0h2m1 0h2m3 0h1m-29 1h2m1 0h2m1 0h2m2 0h1m1 0h1m1 0h1m1 0h3m3 0h1m1 0h4m-27 1h1m1 0h3m2 0h2m1 0h2m1 0h3m1 0h3m7 0h1m-28 1h1m1 0h1m1 0h2m3 0h1m2 0h3m1 0h3m1 0h1m1 0h1m1 0h4m-29 1h1m2 0h1m4 0h1m1 0h2m4 0h2m1 0h2m1 0h2m1 0h2m-27 1h2m2 0h1m1 0h2m4 0h1m6 0h1m1 0h5m1 0h2m-29 1h1m2 0h2m2 0h2m1 0h3m2 0h2m3 0h2m2 0h2m2 0h1m-28 1h6m2 0h4m1 0h2m2 0h1m1 0h2m3 0h1m-22 1h1m3 0h2m2 0h1m4 0h2m1 0h1m1 0h2m1 0h1m-26 1h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m2 0h1m4 0h1m3 0h1m-24 1h1m1 0h1m4 0h1m2 0h7m1 0h6m1 0h1m-28 1h1m1 0h2m1 0h1m4 0h2m2 0h1m1 0h1m1 0h6m2 0h1m-20 1h1m1 0h1m4 0h6m3 0h2m1 0h1m-28 1h7m2 0h1m4 0h1m1 0h2m1 0h2m1 0h1m1 0h1m1 0h2m-28 1h1m5 0h1m1 0h1m2 0h2m1 0h1m3 0h1m1 0h1m3 0h1m2 0h1m-28 1h1m1 0h3m1 0h1m3 0h5m3 0h1m1 0h8m-28 1h1m1 0h3m1 0h1m1 0h1m1 0h2m2 0h1m4 0h1m4 0h4m-28 1h1m1 0h3m1 0h1m1 0h3m5 0h2m2 0h1m2 0h1m2 0h1m1 0h1m-29 1h1m5 0h1m1 0h1m6 0h1m3 0h1m2 0h1m1 0h2m1 0h1m-28 1h7m3 0h1m2 0h1m4 0h3m1 0h2m1 0h3"/></svg></div>
+      <div>
+        <div class="k">Чат курса в Telegram</div>
+        <a class="biglink" href="https://t.me/+mSCArWZSDNVmMGQy" target="_blank" rel="noopener">t.me/+mSCArWZSDNVmMGQy</a>
+        <p>Объявления, вопросы по материалам, ссылки на квизы и дедлайны. Вступите сейчас — наведите камеру на код.</p>
+      </div>
+    </div>
+    <div>
+      <div class="kicker" style="margin-bottom:.5rem">Преподаватели</div>
+      <div class="team">
+        <div class="person"><b>Глеб Панин</b><a href="https://t.me/GotliebPt" target="_blank" rel="noopener">@GotliebPt</a><span>ex-X5, сейчас Salmon</span><span>РАНХиГС, сейчас ИТМО</span></div>
+        <div class="person"><b>Анастасия Изюмова</b><a href="https://t.me/izanastasiya" target="_blank" rel="noopener">@izanastasiya</a><span>ex-Самокат, сейчас X5</span><span>ИТМО; преподаёт в ИТМО и ВШЭ</span></div>
+        <div class="person"><b>Дарья Андреева</b><a href="https://t.me/xufana" target="_blank" rel="noopener">@xufana</a><span>X5</span><span>ПМИ ФКН ВШЭ; преподаёт в ИТМО и ВШЭ</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="kicker" style="margin-bottom:.5rem">Оценивание</div>
+      <div class="formula">Итог = 0,15 · <b>квизы</b> + 0,35 · <b>коллоквиум</b> + 0,5 · <b>проект</b></div>
+      <div class="cards">
+        <div class="card"><div class="k">квизы · 0,15</div>Почти на каждой паре. После пары квиз остаётся доступен асинхронно ещё неделю.</div>
+        <div class="card"><div class="k">коллоквиум · 0,35</div>Онлайн, между модулями. Пересдача — по уважительной причине.</div>
+        <div class="card"><div class="k">проект · 0,5</div>Вместо экзамена. Блокирующий: без защиты проекта курс не сдан. Формат — защита в группах.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="s1" class="sec" data-short="Постановка">
+  <div class="sec-head">
+    <h2>Постановка задачи: ничего нового</h2>
+    <p class="lede">Выборка, параметрическая модель, функция потерь, оптимизация. Единственное требование, которое всё определит дальше, — дифференцируемость.</p>
+  </div>
+  <div class="stack">
+    <div class="prose">
+      <p>Есть обучающая выборка <span class="m">{(x<sub>i</sub>, y<sub>i</sub>)}<sup>ℓ</sup><sub>i=1</sub></span>, <span class="m">x<sub>i</sub> ∈ ℝ<sup>d</sup></span>. Есть модель <span class="m">f(x, w)</span> с параметрами <span class="m">w ∈ W</span>. Есть функция потерь <span class="m">L(ŷ, y)</span>, которая говорит, насколько плох ответ модели на одном объекте. Цель — минимизировать средние потери по выборке, эмпирический риск:</p>
+      <div class="eq">Q(w) = <span class="frac"><span>1</span><span>ℓ</span></span> <span class="up">Σ</span><sub>i=1..ℓ</sub> L(f(x<sub>i</sub>, w), y<sub>i</sub>) → min<sub>w</sub></div>
+      <p>Оптимизируем градиентным спуском: <span class="m">w ← w − η ∇<sub>w</sub>Q(w)</span>. Значит, и <span class="m">f</span>, и <span class="m">L</span> должны быть дифференцируемы по <span class="m">w</span>.</p>
+      <p>Для линейной модели <span class="m">f(x, w) = ⟨w, x⟩</span> градиент выписывается руками.</p>
+      <details class="fold">
+        <summary>Напоминание: градиент линейной модели</summary>
+        <p>Регрессия с квадратичной потерей <span class="m">L(ŷ, y) = (ŷ − y)<sup>2</sup></span>:</p>
+        <div class="eq">Q(w) = <span class="frac"><span>1</span><span>ℓ</span></span> <span class="up">Σ</span><sub>i</sub> (⟨w, x<sub>i</sub>⟩ − y<sub>i</sub>)<sup>2</sup>, &nbsp;&nbsp;&nbsp; ∇<sub>w</sub>Q = <span class="frac"><span>2</span><span>ℓ</span></span> <span class="up">Σ</span><sub>i</sub> (⟨w, x<sub>i</sub>⟩ − y<sub>i</sub>) · x<sub>i</sub></div>
+        <p>То есть градиент — сумма объектов <span class="m">x<sub>i</sub></span>, каждый с весом «насколько ошиблись на нём». Для логистической регрессии с log-loss формула та же, только ошибка — <span class="m">σ(⟨w, x<sub>i</sub>⟩) − y<sub>i</sub></span>. На трёх объектах, с редактируемым <span class="m">w</span>:</p>
+        <div class="controls"><div class="ctl sm"><label>w<sub>1</sub></label><input type="number" id="lgW1" value="1" step="0.5"></div><div class="ctl sm"><label>w<sub>2</sub></label><input type="number" id="lgW2" value="-0.5" step="0.5"></div></div>
+        <div class="tablewrap"><table id="lgTable"><thead><tr><th>объект</th><th class="num">x<sub>i</sub></th><th class="num">y<sub>i</sub></th><th class="num">⟨w, x<sub>i</sub>⟩</th><th class="num">ошибка r<sub>i</sub></th><th class="num">r<sub>i</sub> · x<sub>i</sub></th></tr></thead><tbody></tbody></table></div>
+        <p class="mono" id="lgResult" style="font-size:.9rem"></p>
+      </details>
+      <p>Главный технический вопрос занятия: <b>как посчитать <span class="m">∇<sub>w</sub>Q</span>, когда <span class="m">f</span> — композиция десятков функций с миллионами параметров?</b></p>
+      <h3>Что даёт и чего не даёт градиентный спуск</h3>
+      <ul>
+        <li>Шаг вдоль антиградиента уменьшает <span class="m">Q</span> — при достаточно маленьком <span class="m">η</span>.</li>
+        <li>Слишком большой <span class="m">η</span> — расходимся; слишком маленький — стоим на месте.</li>
+        <li>Невыпуклая <span class="m">Q</span> — сходимся в ближайший локальный минимум, какой достанется. У нейросетей <span class="m">Q</span> всегда невыпуклая.</li>
+        <li>Всё, что нужно от модели, — уметь считать значение и градиент. Больше ничего.</li>
+      </ul>
+      <div class="ask"><b>Вопрос в зал:</b> почему нельзя обучать по метрике, например по доле правильных ответов?</div>
+    </div>
+  </div>
+
+  <div class="stage" id="gd">
+    <div class="stage-head"><span class="tag">интерактив</span><h3>Градиентный спуск на поверхности потерь</h3>
+      <p class="hint">Двумерная <span class="m">Q(w<sub>1</sub>, w<sub>2</sub>)</span> с глобальным минимумом в нуле, двумя локальными «ямами» по бокам и разным масштабом по осям. Кликните на карту, чтобы выбрать стартовую точку, и меняйте learning rate.</p></div>
+    <div class="two wide-left">
+      <div>
+        <canvas class="plot click" id="gdCanvas" width="640" height="440" aria-label="Поверхность потерь и траектория градиентного спуска"></canvas>
+        <div class="legend"><span><i style="background:var(--accent)"></i>траектория</span><span><i style="background:var(--ink-3)"></i>темнее — меньше Q</span><span><i style="background:var(--bad)"></i>расходимся</span></div>
+      </div>
+      <div>
+        <div class="controls">
+          <div class="ctl"><label>Learning rate η: <span class="v" id="gdLrV">0.05</span></label><input type="range" id="gdLr" min="-2.3" max="-0.3" step="0.02" value="-1.3"></div>
+          <div class="ctl"><div class="row"><button class="primary" id="gdStep">Шаг</button><button id="gdRun" aria-pressed="false">Запустить</button><button class="ghost" id="gdReset">Сброс</button></div></div>
+        </div>
+        <div class="stats">
+          <div class="stat"><span class="l">шагов</span><span class="n" id="gdSteps">0</span></div>
+          <div class="stat"><span class="l">Q(w)</span><span class="n" id="gdLoss">—</span></div>
+          <div class="stat"><span class="l">‖∇Q‖</span><span class="n" id="gdGrad">—</span></div>
+        </div>
+        <div id="gdMsg" class="note">Кривизна в минимуме: 12 по <span class="m">w<sub>2</sub></span>, 8.5 по <span class="m">w<sub>1</sub></span>. Порог расходимости по крутой оси — <span class="m">η = 2/λ<sub>max</sub> ≈ 0.17</span>. Попробуйте η = 0.02, 0.1, 0.16 и 0.2 из одной и той же точки.</div>
+        <div class="card" style="margin-top:.6rem"><div class="k">Функция</div><span class="m">Q(w) = ½w<sub>1</sub><sup>2</sup> + 6w<sub>2</sub><sup>2</sup> + 1.2(1 − cos 2.5w<sub>1</sub>)</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="s2" class="sec" data-short="Потолок линейного">
+  <div class="sec-head">
+    <h2>Потолок линейной модели</h2>
+    <p class="lede">Линейный классификатор проводит одну гиперплоскость в тех признаках, которые ему дали. Признаки можно придумать руками или взять ядро — но тогда их выбираем мы. Сколько бы линейных слоёв мы ни поставили друг на друга, ничего нового они не выучат: их композиция — всё та же одна гиперплоскость.</p>
+  </div>
+  <div class="stack">
+    <div class="prose">
+      <p>Возьмём <span class="m">x ∈ ℝ<sup>d</sup></span> и построим «глубокую» модель из линейных слоёв:</p>
+      <div class="eq list"><span>z<sub>1</sub> = W<sub>1</sub>x</span><span>z<sub>2</sub> = W<sub>2</sub>z<sub>1</sub></span><span>…</span><span>z<sub>n</sub> = W<sub>n</sub>z<sub>n−1</sub></span></div>
+      <p>где <span class="m">W<sub>i</sub> ∈ ℝ<sup>d<sub>i</sub>×d<sub>i−1</sub></sup></span>. Тогда <span class="m">z<sub>n</sub> = W<sub>n</sub>…W<sub>2</sub>W<sub>1</sub>x = Wx</span>, где <span class="m">W ∈ ℝ<sup>d<sub>n</sub>×d</sup></span> — одна матрица. Сто линейных слоёв — это ровно один линейный слой, только дороже. Смещения ничего не меняют: композиция аффинных отображений аффинна.</p>
+      <p>Значит, чтобы получить что-то новое, между слоями нужно поставить <b>нелинейность</b>. Это единственная причина, по которой в нейросетях есть функции активации.</p>
+    </div>
+    <div class="prose">
+      <h3>Где линейная модель ломается</h3>
+      <p>XOR — классический пример: четыре облака, каждый класс по диагонали. Никакая прямая не отделит их. Кольца, спираль — то же самое. В интерактиве ниже: сначала обучите линейную модель и убедитесь, что граница — прямая, потом добавьте слоёв <i>без</i> активации, потом включите активацию.</p>
+      <div class="ask"><b>Вопрос в зал:</b> линейная модель на XOR даёт около 50 % точности. Можно ли починить её без нейросети? <button class="reveal">ответ</button><span class="ans" hidden>Да: руками добавить признак <span class="m">x<sub>1</sub>x<sub>2</sub></span>. Нейросеть — способ не придумывать такие признаки руками.</span></div>
+    </div>
+  </div>
+
+  <div class="stage" id="lin">
+    <div class="stage-head"><span class="tag">интерактив</span><h3>Стек линейных слоёв — это один линейный слой</h3>
+      <p class="hint">Модель из <span id="linDepthLabel">1</span> слоёв обучается в браузере. Справа — эффективная матрица <span class="m">W = W<sub>n</sub>…W<sub>1</sub></span>, свёрнутая из всех слоёв: она всегда 1×2, сколько слоёв ни ставь. Переключите активацию — и граница перестанет быть прямой.</p></div>
+    <div class="two wide-left">
+      <div>
+        <canvas class="plot" id="linCanvas" width="520" height="420" aria-label="Данные и граница решения"></canvas>
+        <div class="legend"><span><i style="background:var(--ca)"></i>класс A</span><span><i style="background:var(--cb)"></i>класс B</span><span><i style="background:var(--surface-3)"></i>заливка — уверенность модели</span></div>
+      </div>
+      <div>
+        <div class="controls">
+          <div class="ctl"><label>Данные</label><div class="row dsbtns" id="linDs"></div></div>
+          <div class="ctl"><label>Слоёв: <span class="v" id="linDepthV">1</span></label><input type="range" id="linDepth" min="1" max="5" step="1" value="1"></div>
+          <div class="ctl"><label>Между слоями</label><div class="row" id="linAct"><button data-a="none" aria-pressed="true">ничего (линейно)</button><button data-a="tanh" aria-pressed="false">tanh</button></div></div>
+          <div class="ctl"><div class="row"><button class="primary" id="linRun" aria-pressed="false">Обучать</button><button class="ghost" id="linReset">Заново</button></div></div>
+        </div>
+        <div class="stats">
+          <div class="stat"><span class="l">эпох</span><span class="n" id="linEp">0</span></div>
+          <div class="stat"><span class="l">лосс</span><span class="n" id="linLoss">—</span></div>
+          <div class="stat"><span class="l">точность</span><span class="n" id="linAcc">—</span></div>
+        </div>
+        <div class="kicker">Свёрнутая матрица W<sub>n</sub>…W<sub>1</sub> и смещение</div>
+        <div class="wmat" id="linW"></div>
+        <p class="note" id="linNote">Скрытые слои шириной 8. Без активации свёртка точная: модель тождественно равна одной прямой.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="s3" class="sec" data-short="MLP">
+  <div class="sec-head">
+    <h2>Нейрон, слой, MLP</h2>
+    <p class="lede">Слой — аффинное преобразование плюс поэлементная нелинейность. Сеть — несколько таких слоёв подряд. Вся «магия» — в том, что скрытые нейроны выучивают признаки, которые раньше пришлось бы придумывать руками.</p>
+  </div>
+  <div class="stack">
+    <div class="prose">
+      <figure class="figure" id="netFig">
+        <svg viewBox="0 0 640 260" role="img" aria-label="Схема полносвязной сети: три входа, два скрытых слоя по четыре нейрона, один выход"></svg>
+        <figcaption>Полносвязная сеть 3 → 4 → 4 → 1. Каждый круг скрытого слоя — нейрон: взвешенная сумма всех входов плюс смещение, затем σ. Каждая стрелка — одно число из матрицы <span class="m">W<sub>i</sub></span>; между слоями 3 → 4 таких чисел 12, плюс 4 смещения.</figcaption>
+      </figure>
+      <div class="eq list"><span>u<sub>i</sub> = W<sub>i</sub>z<sub>i−1</sub> + b<sub>i</sub></span><span>z<sub>i</sub> = σ(u<sub>i</sub>)</span></div>
+      <ul>
+        <li><span class="m">W<sub>i</sub> ∈ ℝ<sup>d<sub>i</sub>×d<sub>i−1</sub></sup></span> — веса, <span class="m">b<sub>i</sub> ∈ ℝ<sup>d<sub>i</sub></sup></span> — смещения. Обучаются и те и другие. Смещение превращает линейное отображение в аффинное: без него все границы проходили бы через ноль.</li>
+        <li><span class="m">σ: ℝ → ℝ</span> — скалярная нелинейность, применяется к каждой координате <span class="m">u<sub>i</sub></span> отдельно.</li>
+        <li><span class="m">z<sub>i</sub></span> — скрытое (латентное) представление объекта после <span class="m">i</span>-го слоя. Каждая координата — один нейрон.</li>
+        <li>Число параметров слоя: <span class="m">d<sub>i</sub>·d<sub>i−1</sub> + d<sub>i</sub></span>. Слой 784 → 256 — это уже 200 тысяч чисел.</li>
+      </ul>
+      <p>Такой слой называют <b>полносвязным</b> (fully-connected, dense): каждый нейрон связан с каждым нейроном предыдущего слоя. Сеть из таких слоёв — <b>многослойный перцептрон</b> (MLP) или полносвязная сеть (FCN). Последний слой обычно без активации или с активацией под задачу: sigmoid для бинарной классификации, softmax для многоклассовой, ничего для регрессии.</p>
+    </div>
+    <div class="prose">
+      <h3>Что «видит» скрытый нейрон</h3>
+      <p>Для двумерного входа нейрон первого слоя считает <span class="m">σ(w<sub>1</sub>x<sub>1</sub> + w<sub>2</sub>x<sub>2</sub> + b)</span>. Линия <span class="m">w<sub>1</sub>x<sub>1</sub> + w<sub>2</sub>x<sub>2</sub> + b = 0</span> делит плоскость пополам; с одной стороны нейрон «горит», с другой — нет. Каждый нейрон — одна полуплоскость. Следующий слой складывает полуплоскости с весами — и получаются углы, полосы, кольца.</p>
+      <p>Именно это видно в галерее ниже: у сети, обученной на XOR, скрытые нейроны становятся диагональными полуплоскостями, а выходной слой собирает из них «шахматную доску».</p>
+      <div class="ask"><b>Вопрос в зал:</b> сколько нейронов в одном скрытом слое нужно для XOR? <button class="reveal">ответ</button><span class="ans" hidden>Двух достаточно: две полуплоскости, выход считает их разность. Для кольца — три-четыре; для спирали одного слоя мало практически.</span></div>
+    </div>
+  </div>
+
+  <div class="stage" id="pg">
+    <div class="stage-head"><span class="tag">интерактив</span><h3>Конструктор сети</h3>
+      <p class="hint">Соберите MLP, запустите обучение и смотрите на границу решения. Внизу — активации каждого нейрона первого скрытого слоя; клик по нейрону рисует его линию на основной карте. Серым помечены «мёртвые» нейроны, которые не реагируют ни на одну точку.</p></div>
+    <div class="two wide-left">
+      <div>
+        <canvas class="plot" id="pgCanvas" width="520" height="420" aria-label="Данные и граница решения MLP"></canvas>
+        <div class="legend"><span><i style="background:var(--ca)"></i>класс A</span><span><i style="background:var(--cb)"></i>класс B</span><span><i class="ln" style="background:var(--accent)"></i>линия выбранного нейрона</span></div>
+        <div class="kicker" style="margin-top:.8rem">Нейроны первого скрытого слоя</div>
+        <div class="gallery" id="pgGallery"></div>
+      </div>
+      <div>
+        <div class="controls">
+          <div class="ctl"><label>Данные</label><div class="row dsbtns" id="pgDs"></div></div>
+          <div class="ctl"><label>Скрытые слои</label><select id="pgArch">
+            <option value="">нет (линейная модель)</option>
+            <option value="2">2</option>
+            <option value="4" selected>4</option>
+            <option value="8">8</option>
+            <option value="8,8">8 → 8</option>
+            <option value="16,16">16 → 16</option>
+            <option value="16,16,16">16 → 16 → 16</option>
+          </select></div>
+          <div class="ctl"><label>Активация σ</label><select id="pgAct"><option value="tanh" selected>tanh</option><option value="relu">ReLU</option><option value="sigmoid">sigmoid</option><option value="lrelu">Leaky ReLU</option></select></div>
+          <div class="ctl"><label>Learning rate: <span class="v" id="pgLrV">0.03</span></label><input type="range" id="pgLr" min="-3" max="-0.5" step="0.05" value="-1.52"></div>
+          <div class="ctl"><label>Шум в данных: <span class="v" id="pgNoiseV">0.15</span></label><input type="range" id="pgNoise" min="0" max="0.5" step="0.05" value="0.15"></div>
+          <div class="ctl"><div class="row"><button class="primary" id="pgRun" aria-pressed="false">Обучать</button><button id="pgStep">+1 эпоха</button><button class="ghost" id="pgReset">Заново</button></div></div>
+        </div>
+        <div class="stats">
+          <div class="stat"><span class="l">эпох</span><span class="n" id="pgEp">0</span></div>
+          <div class="stat"><span class="l">лосс</span><span class="n" id="pgLoss">—</span></div>
+          <div class="stat"><span class="l">точность</span><span class="n" id="pgAcc">—</span></div>
+          <div class="stat"><span class="l">параметров</span><span class="n" id="pgParams">—</span></div>
+        </div>
+        <div class="note" id="pgNote">Что показать: линейная модель на XOR — 50 %; два нейрона tanh — уже почти 100 %; спираль требует двух-трёх слоёв по 16. Sigmoid на 16→16→16 учится заметно медленнее tanh — к этому вернёмся в конце.</div>
+        <div class="note">Об интерпретируемости. Нейроны первого слоя читаются глазами только потому, что вход двумерный: каждый — полуплоскость. Второй слой складывает полуплоскости, третий — их комбинации, и уже там осмысленной картинки нет: признаки распределены по многим нейронам сразу. В сетях на изображениях первый слой тоже интерпретируем (детекторы краёв и цветовых переходов), дальше — всё хуже. Интерпретируемость глубоких слоёв — отдельная область исследований, а не свойство модели по умолчанию.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="s4" class="sec" data-short="Chain rule">
+  <div class="sec-head">
+    <h2>Как получить градиент: chain rule</h2>
+    <p class="lede">Нейросеть — композиция функций. Производная композиции — произведение производных. Осталось понять, как это организовать, чтобы не считать миллион раз одно и то же.</p>
+  </div>
+  <div class="stack">
+    <div class="prose">
+      <p>Скалярный случай. Если <span class="m">y = f(g(x))</span>, то</p>
+      <div class="eq"><span class="frac"><span>dy</span><span>dx</span></span> = <span class="frac"><span>df</span><span>dg</span></span> · <span class="frac"><span>dg</span><span>dx</span></span></div>
+      <p>Несколько путей. Если <span class="m">y = f(g<sub>1</sub>(x), …, g<sub>n</sub>(x))</span>, вклады всех путей от <span class="m">x</span> к <span class="m">y</span> складываются:</p>
+      <div class="eq"><span class="frac"><span>dy</span><span>dx</span></span> = <span class="up">Σ</span><sub>i=1..n</sub> <span class="frac"><span>∂f</span><span>∂g<sub>i</sub></span></span> · <span class="frac"><span>dg<sub>i</sub></span><span>dx</span></span></div>
+      <p>Это <i>частные</i> производные <span class="m">f</span> по своим аргументам, а не полные. Всё, что делает backpropagation, — применяет эти две формулы к графу вычислений в правильном порядке.</p>
+      <p class="note">Напоминание. Частная производная <span class="m">∂f/∂g<sub>i</sub></span> — производная <span class="m">f</span> как функции нескольких аргументов по одному из них при остальных зафиксированных: она не знает, что все <span class="m">g<sub>i</sub></span> зависят от одного <span class="m">x</span>. Полная производная <span class="m">dy/dx</span> учитывает все зависимости сразу — это и есть сумма по путям выше. В графе на каждом ребре стоит частная производная, а полная собирается из них суммированием.</p>
+    </div>
+    <div class="prose" hidden>
+      <h3 style="margin-top:0">Три способа дифференцировать</h3>
+      <ul>
+        <li><b>Символическое.</b> Из выражения <span class="m">x<sup>2</sup></span> получаем выражение <span class="m">2x</span>, для всех <span class="m">x</span> сразу. Для сети из сотни слоёв выражение разрастается экспоненциально; нам оно и не нужно.</li>
+        <li><b>Численное.</b> <span class="m">(f(x + h) − f(x)) / h</span>. Просто, но приближённо, и на каждый параметр нужен отдельный прогон сети: миллион параметров — миллион прямых проходов на один шаг. Годится только для проверки.</li>
+        <li><b>Автоматическое.</b> Нам нужно не выражение, а <i>число</i> — значение градиента в текущей точке <span class="m">w</span>. Считаем его точно, по цепному правилу, переиспользуя уже вычисленные значения. Один прямой и один обратный проход на все параметры сразу.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="stage" id="nd">
+    <div class="stage-head"><span class="tag">интерактив</span><h3>Численная производная: почему она только для проверки</h3>
+      <p class="hint">Функция <span class="m">f(x) = x<sup>2</sup> sin 3x</span>. Двигайте шаг <span class="m">h</span>: при большом <span class="m">h</span> мешает нелинейность, при маленьком — ошибка округления в float64. Точной производной не получается ни при каком <span class="m">h</span>.</p></div>
+    <div class="two">
+      <div>
+        <canvas class="plot" id="ndCanvas" width="520" height="300" aria-label="График функции, касательная и секущая"></canvas>
+        <div class="legend"><span><i class="ln" style="background:var(--ink-2)"></i>f(x)</span><span><i class="ln" style="background:var(--fwd)"></i>касательная (точная)</span><span><i class="ln" style="background:var(--bwd)"></i>секущая через x и x + h</span></div>
+      </div>
+      <div>
+        <canvas class="plot" id="ndErr" width="520" height="300" aria-label="Ошибка численной производной в зависимости от h"></canvas>
+        <div class="legend"><span><i class="ln" style="background:var(--bwd)"></i>ошибка вперёд: (f(x+h) − f(x)) / h</span><span><i class="ln" style="background:var(--accent)"></i>центральная: (f(x+h) − f(x−h)) / 2h</span></div>
+      </div>
+    </div>
+    <div class="controls" style="margin-top:.8rem">
+      <div class="ctl"><label>Точка x<sub>0</sub>: <span class="v" id="ndXV">1.20</span></label><input type="range" id="ndX" min="-2" max="2" step="0.05" value="1.2"></div>
+      <div class="ctl" style="min-width:260px"><label>Шаг h = 10<sup id="ndHExp">−2</sup>: <span class="v" id="ndHV">0.01</span></label><input type="range" id="ndH" min="-14" max="0" step="0.1" value="-2"></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="l">точная f′(x₀)</span><span class="n" id="ndExact">—</span></div>
+      <div class="stat"><span class="l">вперёд</span><span class="n" id="ndFwd">—</span><span class="s" id="ndFwdE"></span></div>
+      <div class="stat"><span class="l">центральная</span><span class="n" id="ndCen">—</span><span class="s" id="ndCenE"></span></div>
+    </div>
+  </div>
+</section>
+
+<section id="s5" class="sec" data-short="Граф и backprop">
+  <div class="sec-head">
+    <h2>Вычислительный граф и backpropagation</h2>
+    <p class="lede">Любое вычисление раскладывается в граф из простых операций. Прямой проход считает значения от входов к выходу; обратный — производные от выхода к входам, переиспользуя значения прямого.</p>
+  </div>
+  <div class="prose">
+    <p>Пример из конспекта: <span class="m">f(x<sub>1</sub>, x<sub>2</sub>, x<sub>3</sub>) = x<sub>1</sub><sup>2</sup>(x<sub>2</sub>x<sub>3</sub> − 2x<sub>1</sub><sup>2</sup>)</span>. Разложим в граф:</p>
+    <div class="eq list"><span>z<sub>1</sub> = x<sub>1</sub><sup>2</sup></span><span>z<sub>2</sub> = x<sub>2</sub> · x<sub>3</sub></span><span>z<sub>3</sub> = 2 · z<sub>1</sub></span><span>z<sub>4</sub> = z<sub>2</sub> − z<sub>3</sub></span><span>y = z<sub>1</sub> · z<sub>4</sub></span></div>
+    <p>В каждом узле — своя элементарная операция с известной локальной производной. Обратный проход идёт по узлам в порядке, обратном прямому: для узла <span class="m">z</span> уже известно <span class="m">dy/dz</span>, и оно передаётся каждому входу, умноженное на локальную производную. Если в узел ведёт несколько путей — вклады складываются. Так у <span class="m">z<sub>1</sub></span>: один путь напрямую в <span class="m">y</span>, второй через <span class="m">z<sub>3</sub></span>.</p>
+  </div>
+
+  <div class="stage" id="cgs">
+    <div class="stage-head"><span class="tag">интерактив</span><h3>Прямой и обратный проход по шагам</h3>
+      <p class="hint">Зелёное — значения прямого прохода, оранжевое — производные <span class="m">dy/d·</span> обратного. Входы можно менять. Обратите внимание, какие значения прямого прохода нужны обратному: они подсвечены заливкой.</p></div>
+    <div class="cg cgs">
+      <div>
+        <svg viewBox="0 0 640 352" id="cgSvg" role="img" aria-label="Вычислительный граф из пяти операций"></svg>
+        <div class="controls" style="margin-top:.6rem">
+          <div class="ctl sm"><label>x<sub>1</sub></label><input type="number" id="cgX1" value="1" step="0.5"></div>
+          <div class="ctl sm"><label>x<sub>2</sub></label><input type="number" id="cgX2" value="2" step="0.5"></div>
+          <div class="ctl sm"><label>x<sub>3</sub></label><input type="number" id="cgX3" value="3" step="0.5"></div>
+          <div class="ctl"><div class="row"><button class="ghost" id="cgPrev">← Назад</button><button class="primary" id="cgNext">Вперёд →</button><button id="cgAuto" aria-pressed="false">Автопрогон</button><button class="ghost" id="cgReset">Сброс</button></div></div>
+        </div>
+      </div>
+      <div>
+        <div class="stepinfo" id="cgInfo"></div>
+        <div class="steplog" id="cgLog"></div>
+        <div class="row" style="margin-top:.8rem"><span class="pill fwd">forward</span><span class="pill bwd">backward</span><span id="cgCheck" class="pill"></span></div>
+      </div>
+    </div>
+    <div class="cards" style="margin-top:1rem">
+      <div class="card fwd"><div class="k">Наблюдение 1 — память</div>Обратному проходу нужны <span class="m">z<sub>1</sub>, z<sub>4</sub>, x<sub>1</sub>, x<sub>2</sub>, x<sub>3</sub></span> — значения, посчитанные на прямом. Их приходится хранить до конца обратного прохода. В реальной сети это активации всех слоёв на всём батче: именно они, а не веса, занимают память при обучении.</div>
+      <div class="card bwd"><div class="k">Наблюдение 2 — стоимость</div>Каждое ребро графа обрабатывается один раз на прямом и один раз на обратном проходе. Градиент по <i>всем</i> входам стоит примерно столько же, сколько одно вычисление функции, — а не в <span class="m">d</span> раз дороже, как у численного метода. В этом весь смысл backprop.</div>
+      <div class="card"><div class="k">Проверка</div>Аналитически <span class="m">∂f/∂x<sub>1</sub> = 2x<sub>1</sub>x<sub>2</sub>x<sub>3</sub> − 8x<sub>1</sub><sup>3</sup></span>, <span class="m">∂f/∂x<sub>2</sub> = x<sub>1</sub><sup>2</sup>x<sub>3</sub></span>, <span class="m">∂f/∂x<sub>3</sub> = x<sub>1</sub><sup>2</sup>x<sub>2</sub></span>. При <span class="m">x = (1, 2, 3)</span>: <span class="mono">4, 3, 2</span>. Граф даёт то же самое — сверка в правом углу.</div>
+    </div>
+  </div>
+</section>
+
+<section id="s6" class="sec" data-short="Backprop в сети">
+  <div class="sec-head">
+    <h2>Backprop через слои сети</h2>
+    <p class="lede">Сеть — тот же граф, только узлы — слои, а рёбра — векторы. Формула та же, что на прошлом шаге; новое в ней одно — множитель <span class="m">σ′(u<sub>i</sub>)</span> на каждом слое.</p>
+  </div>
+  <div class="stack">
+    <div class="prose">
+      <p>Запишем сеть как цепочку: <span class="m">z<sub>1</sub> = f<sub>1</sub>(x; W<sub>1</sub>)</span>, <span class="m">z<sub>2</sub> = f<sub>2</sub>(z<sub>1</sub>; W<sub>2</sub>)</span>, …, <span class="m">y = f<sub>n</sub>(z<sub>n−1</sub>; W<sub>n</sub>)</span>, и потеря <span class="m">L(y)</span>. У каждого узла два входа: активации с предыдущего слоя <span class="m">z<sub>i−1</sub></span> и собственные параметры <span class="m">W<sub>i</sub></span>. Обратный проход отдаёт градиент по обоим:</p>
+      <div class="eq"><span class="frac"><span>∂L</span><span>∂W<sub>i</sub></span></span> = <span class="frac"><span>∂L</span><span>∂z<sub>i</sub></span></span> · <span class="frac"><span>∂z<sub>i</sub></span><span>∂W<sub>i</sub></span></span>, &nbsp;&nbsp;&nbsp; <span class="frac"><span>∂L</span><span>∂z<sub>i−1</sub></span></span> = <span class="frac"><span>∂L</span><span>∂z<sub>i</sub></span></span> · <span class="frac"><span>∂z<sub>i</sub></span><span>∂z<sub>i−1</sub></span></span></div>
+      <p>Первое — градиент по параметрам, он уходит в оптимизатор. Второе — то, что передаётся дальше назад. Для полносвязного слоя <span class="m">u<sub>i</sub> = W<sub>i</sub>z<sub>i−1</sub> + b<sub>i</sub></span>, <span class="m">z<sub>i</sub> = σ(u<sub>i</sub>)</span> обе локальные производные выписываются явно. Обозначим <span class="m">δ<sub>i</sub> = ∂L/∂u<sub>i</sub> = ∂L/∂z<sub>i</sub> ⊙ σ′(u<sub>i</sub>)</span>, тогда:</p>
+      <div class="eq list"><span><span class="frac"><span>∂L</span><span>∂W<sub>i</sub></span></span> = δ<sub>i</sub> z<sub>i−1</sub><sup>⊤</sup></span><span><span class="frac"><span>∂L</span><span>∂b<sub>i</sub></span></span> = δ<sub>i</sub></span><span><span class="frac"><span>∂L</span><span>∂z<sub>i−1</sub></span></span> = W<sub>i</sub><sup>⊤</sup> δ<sub>i</sub></span></div>
+      <p>Матрица <span class="m">W<sub>i</sub></span> появляется в двух ролях, и это не путаница. В первой формуле по ней <i>дифференцируем</i> — это градиент, который изменит веса. В третьей она стоит <i>внутри</i> производной как коэффициент: <span class="m">u<sub>i</sub></span> линейна по <span class="m">z<sub>i−1</sub></span>, поэтому <span class="m">∂u<sub>i</sub>/∂z<sub>i−1</sub> = W<sub>i</sub></span>, и градиент, идущий назад, умножается на транспонированную матрицу текущих весов. Одна и та же матрица: по ней считаем шаг и через неё пропускаем сигнал.</p>
+      <p>Каждый слой умножает градиент на <span class="m">σ′(u<sub>i</sub>)</span> и на <span class="m">W<sub>i</sub><sup>⊤</sup></span>. Через <span class="m">k</span> слоёв — произведение <span class="m">k</span> таких множителей. Если они систематически меньше единицы, градиент затухает экспоненциально с глубиной; если больше — взрывается.</p>
+    </div>
+    <div class="prose">
+      <figure class="figure">
+        <svg viewBox="0 0 520 200" role="img" aria-label="Цепочка слоёв: прямой проход слева направо, обратный справа налево">
+          <defs>
+            <marker id="arrF" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--fwd)"/></marker>
+            <marker id="arrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--bwd)"/></marker>
+          </defs>
+          <g>
+            <rect x="20" y="70" width="60" height="60" rx="8" fill="var(--surface-2)" stroke="var(--line-2)"/><text x="50" y="106" class="svgtxt h" text-anchor="middle">x</text>
+            <rect x="140" y="70" width="60" height="60" rx="8" fill="var(--surface-2)" stroke="var(--line-2)"/><text x="170" y="106" class="svgtxt h" text-anchor="middle">z₁</text>
+            <rect x="260" y="70" width="60" height="60" rx="8" fill="var(--surface-2)" stroke="var(--line-2)"/><text x="290" y="106" class="svgtxt h" text-anchor="middle">z₂</text>
+            <rect x="380" y="70" width="60" height="60" rx="8" fill="var(--surface-2)" stroke="var(--line-2)"/><text x="410" y="106" class="svgtxt h" text-anchor="middle">y</text>
+            <rect x="465" y="80" width="40" height="40" rx="20" fill="var(--warm-soft)" stroke="var(--warm)"/><text x="485" y="105" class="svgtxt h" text-anchor="middle">L</text>
+          </g>
+          <g stroke="var(--fwd)" stroke-width="2" fill="none">
+            <path d="M82,92 L136,92" marker-end="url(#arrF)"/><path d="M202,92 L256,92" marker-end="url(#arrF)"/><path d="M322,92 L376,92" marker-end="url(#arrF)"/><path d="M442,92 L461,92" marker-end="url(#arrF)"/>
+          </g>
+          <g stroke="var(--bwd)" stroke-width="2" fill="none" stroke-dasharray="5 4">
+            <path d="M461,110 L444,110" marker-end="url(#arrB)"/><path d="M376,110 L324,110" marker-end="url(#arrB)"/><path d="M256,110 L204,110" marker-end="url(#arrB)"/><path d="M136,110 L84,110" marker-end="url(#arrB)"/>
+          </g>
+          <g class="svgtxt" style="font-size:11px">
+            <text x="110" y="82" text-anchor="middle" style="fill:var(--fwd)">f₁(·; W₁)</text>
+            <text x="230" y="82" text-anchor="middle" style="fill:var(--fwd)">f₂(·; W₂)</text>
+            <text x="350" y="82" text-anchor="middle" style="fill:var(--fwd)">f₃(·; W₃)</text>
+            <text x="110" y="128" text-anchor="middle" style="fill:var(--bwd)">∂L/∂x</text>
+            <text x="230" y="128" text-anchor="middle" style="fill:var(--bwd)">∂L/∂z₁</text>
+            <text x="350" y="128" text-anchor="middle" style="fill:var(--bwd)">∂L/∂z₂</text>
+            <text x="452" y="128" text-anchor="middle" style="fill:var(--bwd)">∂L/∂y</text>
+          </g>
+          <g stroke="var(--bwd)" stroke-width="1.5" fill="none" stroke-dasharray="3 3">
+            <path d="M170,132 L170,160" marker-end="url(#arrB)"/><path d="M290,132 L290,160" marker-end="url(#arrB)"/><path d="M410,132 L410,160" marker-end="url(#arrB)"/>
+          </g>
+          <g class="svgtxt" style="font-size:11px; fill:var(--bwd)">
+            <text x="170" y="180" text-anchor="middle">∂L/∂W₁</text><text x="290" y="180" text-anchor="middle">∂L/∂W₂</text><text x="410" y="180" text-anchor="middle">∂L/∂W₃</text>
+          </g>
+          <text x="20" y="30" class="svgtxt">прямой проход: значения, хранятся</text>
+          <text x="20" y="46" class="svgtxt" style="fill:var(--bwd)">обратный: градиенты по активациям — дальше назад, по параметрам — в оптимизатор</text>
+        </svg>
+        <figcaption>Каждый слой отдаёт два градиента: по своим параметрам (вниз, в оптимизатор) и по входу (назад, следующему слою). Прямой проход должен быть сохранён целиком до начала обратного.</figcaption>
+      </figure>
+      <div class="ask"><b>Вопрос в зал:</b> где в этой схеме нужна память, а где — вычисления? <button class="reveal">ответ</button><span class="ans" hidden>Память: все <span class="m">z<sub>i</sub></span> и <span class="m">u<sub>i</sub></span> на батч. Вычисления: обратный проход примерно вдвое дороже прямого — два матричных умножения на слой вместо одного.</span></div>
+    </div>
+  </div>
+
+  <div class="stage" id="bp">
+    <div class="stage-head"><span class="tag">интерактив</span><h3>Backprop руками: сеть 2 → 2 → 1</h3>
+      <p class="hint">Та же формула на конкретных числах. Вход <span class="m">x ∈ ℝ<sup>2</sup></span>, один скрытый слой из двух нейронов, скалярный выход, квадратичная потеря <span class="m">L = ½(ŷ − y)<sup>2</sup></span>. Все числа можно менять. «Дальше» показывает по одному шагу: сначала прямой проход, потом обратный. В режиме «посчитать самим» обратный проход скрыт — впишите градиенты по параметрам и проверьте себя.</p></div>
+    <div class="two wide-left">
+      <div>
+        <div class="cgs"><svg viewBox="0 0 560 300" id="bpSvg" role="img" aria-label="Сеть из двух входов, двух скрытых нейронов и одного выхода"></svg></div>
+        <div class="bpgrid">
+          <div><div class="k">вход x</div><div class="row"><input type="number" id="bp_x1" value="1" step="0.5"><input type="number" id="bp_x2" value="2" step="0.5"></div></div>
+          <div><div class="k">W<sub>1</sub> (2×2), по строкам</div><div class="row"><input type="number" id="bp_w11" value="0.5" step="0.5"><input type="number" id="bp_w12" value="-1" step="0.5"></div><div class="row"><input type="number" id="bp_w21" value="1" step="0.5"><input type="number" id="bp_w22" value="0.5" step="0.5"></div></div>
+          <div><div class="k">b<sub>1</sub></div><div class="row"><input type="number" id="bp_b1" value="0" step="0.5"><input type="number" id="bp_b2" value="-1" step="0.5"></div></div>
+          <div><div class="k">W<sub>2</sub> (1×2)</div><div class="row"><input type="number" id="bp_v1" value="2" step="0.5"><input type="number" id="bp_v2" value="-1" step="0.5"></div></div>
+          <div><div class="k">b<sub>2</sub></div><div class="row"><input type="number" id="bp_c" value="0.5" step="0.5"></div></div>
+          <div><div class="k">цель y</div><div class="row"><input type="number" id="bp_y" value="1" step="0.5"></div></div>
+          <div><div class="k">σ</div><select id="bp_act"><option value="relu" selected>ReLU</option><option value="sigmoid">sigmoid</option><option value="tanh">tanh</option></select></div>
+        </div>
+      </div>
+      <div>
+        <div class="row" style="margin-bottom:.6rem"><button class="ghost" id="bpPrev">← Назад</button><button class="primary" id="bpNext">Дальше →</button><button id="bpAll">Показать всё</button><button id="bpQuiz" aria-pressed="false">Посчитать самим</button></div>
+        <div class="steplog" id="bpLog" style="max-height:none"></div>
+        <div id="bpQuizBox" hidden>
+          <div class="kicker" style="margin:.8rem 0 .4rem">Впишите градиенты по параметрам</div>
+          <div class="quizgrid">
+            <label>∂L/∂W<sub>2</sub> <input type="number" data-q="dv1" step="any"><input type="number" data-q="dv2" step="any"></label>
+            <label>∂L/∂b<sub>2</sub> <input type="number" data-q="dc" step="any"></label>
+            <label>∂L/∂W<sub>1</sub>, строка 1 <input type="number" data-q="dw11" step="any"><input type="number" data-q="dw12" step="any"></label>
+            <label>∂L/∂W<sub>1</sub>, строка 2 <input type="number" data-q="dw21" step="any"><input type="number" data-q="dw22" step="any"></label>
+            <label>∂L/∂b<sub>1</sub> <input type="number" data-q="db1" step="any"><input type="number" data-q="db2" step="any"></label>
+          </div>
+          <div class="row" style="margin-top:.6rem"><button class="primary" id="bpCheck">Проверить</button><span id="bpQuizRes" class="pill"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage" id="gn">
+    <div class="stage-head"><span class="tag">интерактив</span><h3>Куда доходит градиент</h3>
+      <p class="hint">MLP на кольцах: скрытых слоёв <span id="gnDepthLabel">6</span> по 16 нейронов. Столбцы — норма градиента <span class="m">‖∂L/∂W<sub>i</sub>‖</span> по слоям, слева вход, справа выход. Шкала логарифмическая. Поменяйте активацию и глубину, потом нажмите «Обучить» и посмотрите, что происходит с лоссом.</p></div>
+    <div class="two wide-left">
+      <div>
+        <div class="lbars" id="gnBars"></div>
+        <div class="lbarlabels" id="gnLabels"></div>
+        <div class="axis-note">норма градиента по весам слоя, log₁₀; столбец до низа — 10⁻⁶ и меньше</div>
+      </div>
+      <div>
+        <div class="controls">
+          <div class="ctl"><label>Активация</label><select id="gnAct"><option value="sigmoid" selected>sigmoid</option><option value="tanh">tanh</option><option value="relu">ReLU</option><option value="lrelu">Leaky ReLU</option></select></div>
+          <div class="ctl"><label>Скрытых слоёв: <span class="v" id="gnDepthV">6</span></label><input type="range" id="gnDepth" min="1" max="12" step="1" value="6"></div>
+          <div class="ctl"><label>Инициализация</label><select id="gnInit"><option value="0.5">маленькая (×0.5 от Xavier)</option><option value="1" selected>Xavier</option><option value="2">большая (×2 от Xavier)</option></select></div>
+          <div class="ctl"><div class="row"><button class="primary" id="gnTrain">Обучить 200 шагов</button><button class="ghost" id="gnReset">Новая инициализация</button></div></div>
+        </div>
+        <div class="stats">
+          <div class="stat"><span class="l">первый / последний</span><span class="n" id="gnRatio">—</span><span class="s">отношение норм градиента</span></div>
+          <div class="stat"><span class="l">лосс</span><span class="n" id="gnLoss">—</span><span class="s" id="gnLossS">до обучения</span></div>
+          <div class="stat"><span class="l">точность</span><span class="n" id="gnAcc">—</span></div>
+        </div>
+        <div class="note" id="gnNote">Сценарий: sigmoid, 6 слоёв — первый слой получает градиент в тысячи раз меньше последнего, после 200 шагов лосс почти не двигается. Переключите на ReLU при той же глубине.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="s7" class="sec" data-short="Активации">
+  <div class="sec-head">
+    <h2>Функции активации и затухающие градиенты</h2>
+    <p class="lede">Множитель <span class="m">σ′(u)</span> появляется на каждом слое. Какой он — решает, дойдёт ли сигнал обучения до первых слоёв.</p>
+  </div>
+  <div class="cols">
+    <div class="prose">
+      <h3 style="margin-top:0">Sigmoid</h3>
+      <div class="eq">σ(x) = <span class="frac"><span>1</span><span>1 + e<sup>−x</sup></span></span>, &nbsp;&nbsp; σ′(x) = σ(x)(1 − σ(x)) ≤ ¼</div>
+      <p>Историческая активация: гладкая, выход в (0, 1), интерпретируется как вероятность. Но производная не больше 0.25, а вдали от нуля — практически ноль (насыщение). Через десять слоёв градиент умножится на число не больше <span class="m">0.25<sup>10</sup> ≈ 10<sup>−6</sup></span>. Это и есть <b>затухание градиента</b>: последние слои учатся, первые стоят.</p>
+      <h3>tanh</h3>
+      <p>Та же форма, но выход в (−1, 1), центрирован, максимум производной равен 1. Насыщается точно так же, но затухает медленнее — поэтому в маленьких сетях работает заметно лучше sigmoid.</p>
+    </div>
+    <div class="prose">
+      <h3 style="margin-top:0">ReLU</h3>
+      <div class="eq">ReLU(x) = max(0, x), &nbsp;&nbsp; ReLU′(x) = [x > 0]</div>
+      <p class="note">Как дифференцировать max. <span class="m">max(0, x)</span> — это <span class="m">x</span> при <span class="m">x > 0</span> и <span class="m">0</span> при <span class="m">x < 0</span>, поэтому производная 1 или 0. В самой точке 0 производной нет, есть субградиент — любое число из [0, 1]; фреймворки берут 0. То же для <span class="m">max(a, b)</span> вообще: градиент целиком уходит в тот аргумент, который победил, — так работает и max-pooling.</p>
+      <p>Производная либо 0, либо 1 — множитель не затухает, пока нейрон активен. В нуле функция не дифференцируема, и это не проблема: вероятность попасть ровно в ноль нулевая, берём любое значение из [0, 1]. Дёшево считается. Проблема другая — <b>мёртвые нейроны</b>: если нейрон ушёл в отрицательную область на всех объектах, его градиент тождественно ноль, и обратно он уже не вернётся.</p>
+      <h3>Leaky ReLU</h3>
+      <div class="eq">LeakyReLU(x) = max(αx, x), &nbsp;&nbsp; α ≈ 0.01…0.2</div>
+      <p>Маленький наклон в отрицательной области — градиент никогда не ноль ровно, нейроны не умирают. Дальше по тому же пути — ELU, GELU, SiLU: гладкие варианты ReLU, стандарт в трансформерах. Идея всех — производная около 1 на большей части области.</p>
+    </div>
+  </div>
+
+  <div class="stage" id="ae">
+    <div class="stage-head"><span class="tag">интерактив</span><h3>Активации и произведение производных</h3>
+      <p class="hint">Слева — <span class="m">σ</span> и <span class="m">σ′</span> для выбранной активации. Справа — во сколько раз в среднем уменьшается норма градиента через <span class="m">k</span> слоёв за счёт одних только активаций: на каждом слое множитель <span class="m">√E[σ′(u)<sup>2</sup>]</span> при преактивациях <span class="m">u ~ N(0, s<sup>2</sup>)</span>, веса не учитываются. Все четыре активации на одном графике.</p></div>
+    <div class="two">
+      <div>
+        <div class="controls">
+          <div class="ctl"><label>Активация</label><div class="row" id="aeBtns"></div></div>
+          <div class="ctl sm"><label>α для Leaky ReLU: <span class="v" id="aeAlphaV">0.1</span></label><input type="range" id="aeAlpha" min="0.01" max="0.3" step="0.01" value="0.1"></div>
+        </div>
+        <canvas class="plot" id="aeCanvas" width="520" height="300" aria-label="График функции активации и её производной"></canvas>
+        <div class="legend"><span><i class="ln" style="background:var(--fwd)"></i>σ(x)</span><span><i class="ln" style="background:var(--bwd)"></i>σ′(x)</span></div>
+        <div class="stats"><div class="stat"><span class="l" style="text-transform:none">max σ′</span><span class="n" id="aeMax">—</span></div><div class="stat"><span class="l" style="text-transform:none">σ′ при x = +5 / −5</span><span class="n" id="aeFar">—</span></div></div>
+      </div>
+      <div>
+        <div class="controls">
+          <div class="ctl"><label>Разброс преактиваций s: <span class="v" id="aeSV">1.0</span></label><input type="range" id="aeS" min="0.3" max="3" step="0.1" value="1"></div>
+        </div>
+        <canvas class="plot" id="aeProd" width="520" height="300" aria-label="Медиана произведения производных в зависимости от глубины"></canvas>
+        <div class="legend" id="aeLegend"></div>
+        <p class="note">Sigmoid: множитель около 0.2 на слой — к десятому слою семь порядков. Tanh при большом разбросе преактиваций насыщается и тоже уходит вниз. ReLU даёт <span class="m">√½</span> на слой, потому что половина нейронов выключена, — именно это компенсирует He-инициализация, удваивая дисперсию весов. Leaky ReLU чуть лучше ReLU. Множители от весов <span class="m">W<sub>i</sub><sup>⊤</sup></span> сюда не входят — их масштаб задаёт инициализация.</p>
+        <div class="ask"><b>Вопрос в зал:</b> если ReLU так хорош, почему в выходном слое всё равно sigmoid или softmax? <button class="reveal">ответ</button><span class="ans" hidden>Потому что выход должен быть вероятностью: активация выходного слоя выбирается под лосс, а не под градиент.</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="s8" class="sec" data-short="Без backprop">
+  <div class="sec-head">
+    <h2>Есть ли жизнь без backprop</h2>
+    <p class="lede">Backprop не единственный способ обучать сети — но единственный, который масштабируется. Полезно знать альтернативы, чтобы понимать, чем он хорош.</p>
+  </div>
+  <div class="alt">
+    <div class="card"><span class="y">1950-е — сейчас</span><b>Эволюционные алгоритмы</b><span>Мутируем веса, оставляем лучших. Градиент не нужен — но каждая «особь» стоит полного прогона, и в пространстве из миллиона параметров случайный поиск безнадёжен.</span></div>
+    <div class="card"><span class="y">2000-е</span><b>Reservoir computing</b><span>Большая рекуррентная сеть со случайными фиксированными весами; обучается только линейный выходной слой. Работает на некоторых временных рядах; признаки не адаптируются к задаче.</span></div>
+    <div class="card"><span class="y">2016</span><b>Direct Feedback Alignment</b><span>Вместо <span class="m">W<sup>⊤</sup></span> на обратном проходе — случайная фиксированная матрица. Удивительно, что вообще учится; заметно хуже backprop на глубоких сетях.</span></div>
+    <div class="card"><span class="y">2022</span><b>Forward-Forward (Hinton)</b><span>Два прямых прохода — на «хороших» и «плохих» данных, каждый слой учится локально. Не нужно хранить активации; пока сильно уступает по качеству.</span></div>
+  </div>
+  <p class="note" style="max-width:var(--measure)">Почему все всё равно используют backprop: точный градиент по всем параметрам за один обратный проход, стоимостью порядка прямого. Ни один из вариантов выше не даёт этого одновременно.</p>
+</section>
+
+<section id="s9" class="sec" data-short="Итог">
+  <div class="sec-head">
+    <h2>Итог</h2>
+    <p class="lede">Три ответа на вопрос из начала занятия.</p>
+  </div>
+  <div class="cols">
+    <div class="prose">
+      <ol class="steps">
+        <li><div><b>Нелинейность даёт выразительность.</b> Стек линейных слоёв — одна прямая. Один нелинейный слой из двух нейронов решает XOR; несколько слоёв выучивают признаки, которые иначе пришлось бы придумывать.</div></li>
+        <li><div><b>Backprop делает обучение дешёвым.</b> Градиент по миллиону параметров — один обратный проход по графу за цену примерно одного прямого. Плата — хранить весь прямой проход.</div></li>
+        <li><div><b>Активация решает, дойдёт ли градиент.</b> На каждом слое множитель <span class="m">σ′(u)</span>. Sigmoid его гасит, ReLU сохраняет, но может выключать нейроны насовсем.</div></li>
+      </ol>
+    </div>
+    <div class="takeaway">
+      <h3>Что дальше</h3>
+      <p>Мы умеем считать градиент. Следующие вопросы — как им пользоваться:</p>
+      <ul>
+        <li>напоминание про градиентный спуск и его варианты: стохастический градиент, momentum, Adam;</li>
+        <li>инициализация весов: как выбрать масштаб, чтобы градиент не затухал и не взрывался с первого шага;</li>
+        <li>регуляризация и нормализация — dropout, batch norm;</li>
+        <li>что, кроме полносвязных слоёв, бывает в графе: свёртки, attention.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer>Глубинное обучение · занятие 1 · Все интерактивы считаются в браузере на игрушечных данных; масштабы и числа иллюстративные.</footer>
+<script>
+/* ---------- shared: theme, presentation mode, section chips ---------- */
+const REDRAW = [];
+(function(){
+  const root = document.documentElement, body = document.body;
+  let theme = 'system';
+  try { theme = localStorage.getItem('dl-course-theme') || 'system'; } catch(e){}
+  function applyTheme(){
+    if(theme === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', theme);
+    const b = document.getElementById('themeBtn');
+    if(b) b.textContent = theme === 'system' ? 'Тема: система' : (theme === 'dark' ? 'Тема: тёмная' : 'Тема: светлая');
+    setTimeout(() => REDRAW.forEach(f => { try{ f(); }catch(e){} }), 30);
+  }
+  applyTheme();
+  document.getElementById('themeBtn').addEventListener('click', () => {
+    theme = theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system';
+    try { localStorage.setItem('dl-course-theme', theme); } catch(e){}
+    applyTheme();
+  });
+  if(window.matchMedia){ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(() => REDRAW.forEach(f => f()), 30)); }
+
+  const pBtn = document.getElementById('presentBtn');
+  function setPresent(on){
+    body.classList.toggle('present', on);
+    pBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    pBtn.textContent = on ? 'Режим: презентация' : 'Режим: прокрутка';
+  }
+  setPresent(false);
+  pBtn.addEventListener('click', () => setPresent(!body.classList.contains('present')));
+
+  const secs = Array.from(document.querySelectorAll('main > section'));
+  const chips = document.getElementById('chips');
+  secs.forEach(s => {
+    const a = document.createElement('a');
+    a.className = 'chip'; a.href = '#' + s.id;
+    a.textContent = s.dataset.short || s.querySelector('h1,h2')?.textContent || s.id;
+    chips.appendChild(a);
+  });
+  const chipEls = Array.from(chips.children);
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(en => {
+      if(en.isIntersecting){
+        const i = secs.indexOf(en.target);
+        chipEls.forEach((c,j) => c.classList.toggle('active', i === j));
+        chipEls[i]?.scrollIntoView({block:'nearest', inline:'center', behavior:'smooth'});
+      }
+    });
+  }, {rootMargin:'-40% 0px -55% 0px'});
+  secs.forEach(s => io.observe(s));
+
+  document.addEventListener('keydown', e => {
+    if(!body.classList.contains('present')) return;
+    if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName)) return;
+    if(e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === 'ArrowLeft' || e.key === 'PageUp'){
+      e.preventDefault();
+      const y = window.scrollY + 60; let cur = 0;
+      secs.forEach((s,i) => { if(s.offsetTop <= y + 5) cur = i; });
+      const next = (e.key === 'ArrowRight' || e.key === 'PageDown') ? Math.min(cur + 1, secs.length - 1) : Math.max(cur - 1, 0);
+      secs[next].scrollIntoView({behavior:'smooth', block:'start'});
+    }
+  });
+})();
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+function el(tag, cls, html){ const e = document.createElement(tag); if(cls) e.className = cls; if(html != null) e.innerHTML = html; return e; }
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function hexRgb(h){ h = h.replace('#',''); if(h.length === 3) h = h.split('').map(c => c + c).join(''); const n = parseInt(h, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function rgba(v, a){ const [r,g,b] = hexRgb(cssVar(v)); return `rgba(${r},${g},${b},${a})`; }
+function fmtNum(x, d=3){ if(!isFinite(x)) return '∞'; if(Math.abs(x) >= 1e5 || (Math.abs(x) < 1e-3 && x !== 0)) return x.toExponential(2); return x.toFixed(d); }
+function fmtSci(x){ if(x === 0) return '0'; const e = Math.floor(Math.log10(Math.abs(x))); if(e >= -1 && e <= 2) return x.toPrecision(2); const m = x / Math.pow(10, e); return `${m.toFixed(1)}e${e}`; }
+// seeded RNG (mulberry32) so datasets are reproducible
+function rng(seed){ let a = seed >>> 0; return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gauss(r){ let u = 0, v = 0; while(u === 0) u = r(); while(v === 0) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+// HiDPI canvas: attributes give logical size, we scale the backing store
+function setupCanvas(c){
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  if(!c.dataset.w){ c.dataset.w = c.getAttribute('width'); c.dataset.h = c.getAttribute('height'); }
+  const W = +c.dataset.w, H = +c.dataset.h;   // logical size, kept separately: c.width below overwrites the attribute
+  if(c.dataset.dpr !== String(dpr)){ c.width = W * dpr; c.height = H * dpr; c.style.aspectRatio = `${W} / ${H}`; c.dataset.dpr = dpr; }
+  const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return {ctx, W, H};
+}
+function lineChartFrame(ctx, W, H, pad, xr, yr, opts={}){
+  // axes + grid; returns mapping functions
+  const x = v => pad.l + (v - xr[0]) / (xr[1] - xr[0]) * (W - pad.l - pad.r);
+  const y = v => H - pad.b - (v - yr[0]) / (yr[1] - yr[0]) * (H - pad.t - pad.b);
+  ctx.strokeStyle = cssVar('--grid'); ctx.lineWidth = 1; ctx.font = '11px ' + cssVar('--font-mono'); ctx.fillStyle = cssVar('--ink-3');
+  (opts.xt || []).forEach(t => { ctx.beginPath(); ctx.moveTo(x(t), pad.t); ctx.lineTo(x(t), H - pad.b); ctx.stroke(); ctx.textAlign = 'center'; ctx.fillText(opts.xf ? opts.xf(t) : t, x(t), H - pad.b + 14); });
+  (opts.yt || []).forEach(t => { ctx.beginPath(); ctx.moveTo(pad.l, y(t)); ctx.lineTo(W - pad.r, y(t)); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(opts.yf ? opts.yf(t) : t, pad.l - 6, y(t) + 4); });
+  ctx.strokeStyle = cssVar('--line-2'); ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, H - pad.b); ctx.lineTo(W - pad.r, H - pad.b); ctx.stroke();
+  if(opts.xl){ ctx.fillStyle = cssVar('--ink-2'); ctx.font = '11px ' + cssVar('--font-body'); ctx.textAlign = 'right'; ctx.fillText(opts.xl, W - pad.r, H - 4); }
+  if(opts.yl){ ctx.fillStyle = cssVar('--ink-2'); ctx.font = '11px ' + cssVar('--font-body'); ctx.textAlign = 'left'; ctx.fillText(opts.yl, pad.l + 4, pad.t - 6); }
+  return {x, y};
+}
+
+/* ---------- tiny MLP engine (shared by four interactives) ---------- */
+const ACTS = {
+  none:    {f: x => x, d: x => 1, name: 'нет'},
+  tanh:    {f: Math.tanh, d: x => { const t = Math.tanh(x); return 1 - t*t; }, name: 'tanh'},
+  sigmoid: {f: x => 1/(1+Math.exp(-x)), d: x => { const s = 1/(1+Math.exp(-x)); return s*(1-s); }, name: 'sigmoid'},
+  relu:    {f: x => x > 0 ? x : 0, d: x => x > 0 ? 1 : 0, name: 'ReLU'},
+  lrelu:   {f: x => x > 0 ? x : 0.1*x, d: x => x > 0 ? 1 : 0.1, name: 'Leaky ReLU'},
+};
+class MLP {
+  constructor(sizes, act, initScale = 1, seed = 7){
+    this.sizes = sizes; this.act = ACTS[act]; this.actName = act;
+    const r = rng(seed);
+    this.W = []; this.b = [];
+    for(let l = 0; l < sizes.length - 1; l++){
+      const fin = sizes[l], fout = sizes[l+1];
+      const std = Math.sqrt(2 / (fin + fout)) * initScale;   // Xavier/Glorot, scaled
+      const W = new Float64Array(fout * fin);
+      for(let i = 0; i < W.length; i++) W[i] = gauss(r) * std;
+      this.W.push(W); this.b.push(new Float64Array(fout));
+    }
+    this.L = this.W.length;
+  }
+  nParams(){ return this.W.reduce((a, w, i) => a + w.length + this.b[i].length, 0); }
+  // forward for one input; returns {us, zs} (zs[0] = x, zs[L] = logit)
+  forward(x){
+    const zs = [x], us = [];
+    let z = x;
+    for(let l = 0; l < this.L; l++){
+      const fin = this.sizes[l], fout = this.sizes[l+1], W = this.W[l], b = this.b[l];
+      const u = new Float64Array(fout);
+      for(let i = 0; i < fout; i++){ let s = b[i]; const off = i * fin; for(let j = 0; j < fin; j++) s += W[off + j] * z[j]; u[i] = s; }
+      us.push(u);
+      const last = l === this.L - 1;
+      z = last ? u : u.map(this.act.f);
+      zs.push(z);
+    }
+    return {us, zs};
+  }
+  prob(x){ const {zs} = this.forward(x); return 1 / (1 + Math.exp(-zs[this.L][0])); }
+  // gradient of mean BCE over a batch; returns {dW, db, loss}
+  grads(batch){
+    const dW = this.W.map(w => new Float64Array(w.length)), db = this.b.map(b => new Float64Array(b.length));
+    let loss = 0;
+    for(const [x, y] of batch){
+      const {us, zs} = this.forward(x);
+      const logit = zs[this.L][0];
+      const p = 1 / (1 + Math.exp(-logit));
+      loss += logit >= 0 ? Math.log(1 + Math.exp(-logit)) + (1 - y) * logit : Math.log(1 + Math.exp(logit)) - y * logit;
+      let delta = new Float64Array([p - y]);            // dE/du_L
+      for(let l = this.L - 1; l >= 0; l--){
+        const fin = this.sizes[l], fout = this.sizes[l+1], zin = zs[l];
+        for(let i = 0; i < fout; i++){ db[l][i] += delta[i]; const off = i * fin; for(let j = 0; j < fin; j++) dW[l][off + j] += delta[i] * zin[j]; }
+        if(l > 0){
+          const nd = new Float64Array(fin), W = this.W[l], u = us[l-1];
+          for(let j = 0; j < fin; j++){ let s = 0; for(let i = 0; i < fout; i++) s += W[i * fin + j] * delta[i]; nd[j] = s * this.act.d(u[j]); }
+          delta = nd;
+        }
+      }
+    }
+    const n = batch.length;
+    dW.forEach(g => { for(let i = 0; i < g.length; i++) g[i] /= n; }); db.forEach(g => { for(let i = 0; i < g.length; i++) g[i] /= n; });
+    return {dW, db, loss: loss / n};
+  }
+  step(batch, lr){
+    const g = this.grads(batch);
+    for(let l = 0; l < this.L; l++){ const W = this.W[l], b = this.b[l]; for(let i = 0; i < W.length; i++) W[i] -= lr * g.dW[l][i]; for(let i = 0; i < b.length; i++) b[i] -= lr * g.db[l][i]; }
+    return g.loss;
+  }
+  epoch(data, lr, bs = 16, r = Math.random){
+    const idx = data.map((_, i) => i);
+    for(let i = idx.length - 1; i > 0; i--){ const j = Math.floor(r() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+    let loss = 0, nb = 0;
+    for(let s = 0; s < idx.length; s += bs){ loss += this.step(idx.slice(s, s + bs).map(i => data[i]), lr); nb++; }
+    return loss / nb;
+  }
+  evaluate(data){
+    let loss = 0, correct = 0;
+    for(const [x, y] of data){ const p = this.prob(x); loss += -(y * Math.log(p + 1e-12) + (1 - y) * Math.log(1 - p + 1e-12)); if((p > 0.5) === (y === 1)) correct++; }
+    return {loss: loss / data.length, acc: correct / data.length};
+  }
+}
+
+/* ---------- toy datasets ---------- */
+const DATASETS = {
+  xor:    {name: 'XOR',     gen: (r, n, noise) => { const d = []; for(let i = 0; i < n; i++){ const sx = r() < .5 ? -1 : 1, sy = r() < .5 ? -1 : 1; const x = sx * (0.6 + r() * 1.4) + gauss(r) * noise * 2, y = sy * (0.6 + r() * 1.4) + gauss(r) * noise * 2; d.push([[x, y], sx * sy > 0 ? 1 : 0]); } return d; }},
+  circles:{name: 'кольца',  gen: (r, n, noise) => { const d = []; for(let i = 0; i < n; i++){ const inner = i % 2 === 0; const rad = inner ? r() * 0.9 : 1.5 + r() * 0.8; const a = r() * 2 * Math.PI; d.push([[rad * Math.cos(a) + gauss(r) * noise * 2, rad * Math.sin(a) + gauss(r) * noise * 2], inner ? 1 : 0]); } return d; }},
+  spiral: {name: 'спираль', gen: (r, n, noise) => { const d = []; for(let i = 0; i < n; i++){ const c = i % 2; const t = r(); const rad = 0.3 + t * 2.3, a = t * 2.4 * Math.PI + c * Math.PI; d.push([[rad * Math.cos(a) + gauss(r) * noise * 1.5, rad * Math.sin(a) + gauss(r) * noise * 1.5], c]); } return d; }},
+  gauss:  {name: 'два облака', gen: (r, n, noise) => { const d = []; for(let i = 0; i < n; i++){ const c = i % 2; const cx = c ? 1.2 : -1.2, cy = c ? 1 : -1; d.push([[cx + gauss(r) * (0.5 + noise), cy + gauss(r) * (0.5 + noise)], c]); } return d; }},
+};
+const RANGE = 3; // plane is [-3,3]²
+
+/* ---------- classifier view: boundary heatmap + points + optional neuron line ---------- */
+class ClassifierView {
+  constructor(canvas){ this.c = canvas; this.grid = 64; this.off = document.createElement('canvas'); this.off.width = this.grid; this.off.height = this.grid; this.line = null; }
+  draw(model, data){
+    const {ctx, W, H} = setupCanvas(this.c);
+    const g = this.grid, img = this.off.getContext('2d').createImageData(g, g);
+    const A = hexRgb(cssVar('--ca')), B = hexRgb(cssVar('--cb')), S = hexRgb(cssVar('--surface-2'));
+    const x = new Float64Array(2);
+    for(let iy = 0; iy < g; iy++) for(let ix = 0; ix < g; ix++){
+      x[0] = -RANGE + (ix + .5) / g * 2 * RANGE; x[1] = RANGE - (iy + .5) / g * 2 * RANGE;
+      const p = model ? model.prob(x) : 0.5;
+      const a = Math.min(1, Math.abs(p - .5) * 2) * 0.6;
+      const C = p > .5 ? A : B; // class 1 = A
+      const k = (iy * g + ix) * 4;
+      img.data[k] = S[0] + (C[0] - S[0]) * a; img.data[k+1] = S[1] + (C[1] - S[1]) * a; img.data[k+2] = S[2] + (C[2] - S[2]) * a; img.data[k+3] = 255;
+    }
+    this.off.getContext('2d').putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = true; ctx.clearRect(0, 0, W, H);
+    // keep plane square-ish: use full canvas, map [-R,R] to W×H (slight anisotropy acceptable for 520×420)
+    ctx.drawImage(this.off, 0, 0, W, H);
+    const px = v => (v + RANGE) / (2 * RANGE) * W, py = v => (RANGE - v) / (2 * RANGE) * H;
+    // gridlines through zero
+    ctx.strokeStyle = rgba('--ink-3', .35); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px(0), 0); ctx.lineTo(px(0), H); ctx.moveTo(0, py(0)); ctx.lineTo(W, py(0)); ctx.stroke();
+    // neuron line
+    if(this.line){
+      const [w1, w2, b] = this.line; ctx.strokeStyle = cssVar('--accent'); ctx.lineWidth = 2.5; ctx.beginPath();
+      if(Math.abs(w2) > Math.abs(w1)){ ctx.moveTo(px(-RANGE), py(-(w1 * -RANGE + b) / w2)); ctx.lineTo(px(RANGE), py(-(w1 * RANGE + b) / w2)); }
+      else { ctx.moveTo(px(-(w2 * -RANGE + b) / w1), py(-RANGE)); ctx.lineTo(px(-(w2 * RANGE + b) / w1), py(RANGE)); }
+      ctx.stroke();
+      // shade the "on" side lightly
+      ctx.fillStyle = rgba('--accent', .10); ctx.beginPath();
+      const pts = []; const cornersV = [[-RANGE,-RANGE],[RANGE,-RANGE],[RANGE,RANGE],[-RANGE,RANGE]];
+      // polygon of half-plane w·x+b>0 clipped to square (Sutherland–Hodgman on one edge)
+      let poly = cornersV.slice();
+      const inside = p => w1 * p[0] + w2 * p[1] + b >= 0;
+      const out = [];
+      for(let i = 0; i < poly.length; i++){ const P = poly[i], Q = poly[(i + 1) % poly.length]; const ip = inside(P), iq = inside(Q);
+        if(ip) out.push(P);
+        if(ip !== iq){ const fP = w1 * P[0] + w2 * P[1] + b, fQ = w1 * Q[0] + w2 * Q[1] + b; const t = fP / (fP - fQ); out.push([P[0] + t * (Q[0] - P[0]), P[1] + t * (Q[1] - P[1])]); } }
+      if(out.length){ ctx.moveTo(px(out[0][0]), py(out[0][1])); out.forEach(p => ctx.lineTo(px(p[0]), py(p[1]))); ctx.closePath(); ctx.fill(); }
+    }
+    // points
+    const cA = cssVar('--ca'), cB = cssVar('--cb'), ring = cssVar('--surface');
+    for(const [p, y] of data){ ctx.beginPath(); ctx.arc(px(p[0]), py(p[1]), 4, 0, 2 * Math.PI); ctx.fillStyle = y === 1 ? cA : cB; ctx.fill(); ctx.strokeStyle = ring; ctx.lineWidth = 1.5; ctx.stroke(); }
+  }
+}
+
+/* ================= 1. Градиентный спуск ================= */
+(function(){
+  const c = $('gdCanvas'); const XR = [-4, 4], YR = [-1.5, 1.5];
+  const Q = (a, b) => .5 * a * a + 6 * b * b + 1.2 * (1 - Math.cos(2.5 * a));
+  const dQ = (a, b) => [a + 3 * Math.sin(2.5 * a), 12 * b];
+  let w = [-3.1, 1.1], path = [], diverged = false, timer = null;
+  const heat = document.createElement('canvas'); heat.width = 160; heat.height = 110;
+  function buildHeat(){
+    const g = heat.getContext('2d'), img = g.createImageData(heat.width, heat.height);
+    const lo = hexRgb(cssVar('--surface-2')), hi = hexRgb(cssVar('--accent'));
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark' || (!document.documentElement.getAttribute('data-theme') && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const qmax = Q(4, 1.5);
+    for(let iy = 0; iy < heat.height; iy++) for(let ix = 0; ix < heat.width; ix++){
+      const a = XR[0] + (ix + .5) / heat.width * (XR[1] - XR[0]), b = YR[1] - (iy + .5) / heat.height * (YR[1] - YR[0]);
+      const t = 1 - Math.log(1 + Q(a, b)) / Math.log(1 + qmax);   // 1 at minimum
+      const k = (iy * heat.width + ix) * 4, m = t * 0.75;
+      img.data[k] = lo[0] + (hi[0] - lo[0]) * m; img.data[k+1] = lo[1] + (hi[1] - lo[1]) * m; img.data[k+2] = lo[2] + (hi[2] - lo[2]) * m; img.data[k+3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+  }
+  function draw(){
+    buildHeat();
+    const {ctx, W, H} = setupCanvas(c);
+    ctx.imageSmoothingEnabled = true; ctx.drawImage(heat, 0, 0, W, H);
+    const px = v => (v - XR[0]) / (XR[1] - XR[0]) * W, py = v => (YR[1] - v) / (YR[1] - YR[0]) * H;
+    // contour lines via marching through grid (cheap: sample & draw iso-bands as thin strokes)
+    ctx.strokeStyle = rgba('--ink', .18); ctx.lineWidth = 1;
+    const levels = [0.3, 1, 2, 3.5, 5.5, 8, 12];
+    const n = 120, m = 80;
+    for(const L of levels){ ctx.beginPath();
+      for(let iy = 0; iy < m; iy++) for(let ix = 0; ix < n; ix++){
+        const a0 = XR[0] + ix / n * 8, a1 = XR[0] + (ix + 1) / n * 8, b0 = YR[1] - iy / m * 3, b1 = YR[1] - (iy + 1) / m * 3;
+        const v = [Q(a0, b0), Q(a1, b0), Q(a1, b1), Q(a0, b1)];
+        const P = [[a0,b0],[a1,b0],[a1,b1],[a0,b1]]; const pts = [];
+        for(let e = 0; e < 4; e++){ const va = v[e], vb = v[(e+1)%4]; if((va - L) * (vb - L) < 0){ const t = (L - va) / (vb - va); const A = P[e], B = P[(e+1)%4]; pts.push([A[0] + t * (B[0]-A[0]), A[1] + t * (B[1]-A[1])]); } }
+        if(pts.length >= 2){ ctx.moveTo(px(pts[0][0]), py(pts[0][1])); ctx.lineTo(px(pts[1][0]), py(pts[1][1])); }
+      }
+      ctx.stroke(); }
+    // axes labels
+    ctx.fillStyle = cssVar('--ink-2'); ctx.font = '12px ' + cssVar('--font-head'); ctx.fillText('w₁', W - 22, py(0) - 6); ctx.fillText('w₂', px(0) + 6, 14);
+    // minima markers
+    ctx.fillStyle = cssVar('--ink'); [[0,0],[2.2,0],[-2.2,0]].forEach(([a,b], i) => { ctx.beginPath(); ctx.arc(px(a), py(b), i === 0 ? 4 : 3, 0, 2*Math.PI); ctx.fill(); });
+    ctx.font = '11px ' + cssVar('--font-body'); ctx.fillStyle = cssVar('--ink-2'); ctx.fillText('глобальный', px(0) + 7, py(0) + 16); ctx.fillText('локальный', px(2.2) + 7, py(0) + 16); ctx.fillText('локальный', px(-2.2) + 7, py(0) + 16);
+    // path
+    if(path.length){ ctx.strokeStyle = diverged ? cssVar('--bad') : cssVar('--accent'); ctx.lineWidth = 1.5; ctx.beginPath();
+      path.forEach((p, i) => { const X = Math.max(-40, Math.min(W + 40, px(p[0]))), Y = Math.max(-40, Math.min(H + 40, py(p[1]))); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.stroke();
+      path.forEach((p, i) => { ctx.beginPath(); ctx.arc(px(p[0]), py(p[1]), i === path.length - 1 ? 6 : 3, 0, 2*Math.PI); ctx.fillStyle = diverged && i === path.length - 1 ? cssVar('--bad') : cssVar('--accent'); ctx.fill(); if(i === path.length - 1){ ctx.strokeStyle = cssVar('--surface'); ctx.lineWidth = 2; ctx.stroke(); } });
+    }
+    const q = Q(w[0], w[1]), g = dQ(w[0], w[1]);
+    $('gdSteps').textContent = Math.max(0, path.length - 1); $('gdLoss').textContent = diverged ? '∞' : fmtNum(q, 3); $('gdGrad').textContent = diverged ? '∞' : fmtNum(Math.hypot(g[0], g[1]), 3);
+  }
+  function lr(){ return Math.pow(10, +$('gdLr').value); }
+  function step(){
+    if(diverged) return;
+    const g = dQ(w[0], w[1]); w = [w[0] - lr() * g[0], w[1] - lr() * g[1]]; path.push(w.slice());
+    if(!isFinite(w[0]) || Math.abs(w[0]) > 60 || Math.abs(w[1]) > 60){ diverged = true; stop(); }
+    if(path.length > 400) stop();
+    draw();
+  }
+  function stop(){ if(timer){ clearInterval(timer); timer = null; } $('gdRun').setAttribute('aria-pressed', 'false'); $('gdRun').textContent = 'Запустить'; }
+  function reset(keepStart = true){ stop(); diverged = false; w = keepStart && path.length ? path[0].slice() : [-3.1, 1.1]; path = [w.slice()]; draw(); }
+  $('gdLr').addEventListener('input', () => { $('gdLrV').textContent = lr().toFixed(3); });
+  $('gdLrV').textContent = lr().toFixed(3);
+  $('gdStep').onclick = step;
+  $('gdRun').onclick = () => { if(timer) stop(); else { if(diverged) reset(); timer = setInterval(step, 90); $('gdRun').setAttribute('aria-pressed', 'true'); $('gdRun').textContent = 'Стоп'; } };
+  $('gdReset').onclick = () => reset(true);
+  c.addEventListener('click', e => { const r = c.getBoundingClientRect(); const a = XR[0] + (e.clientX - r.left) / r.width * 8, b = YR[1] - (e.clientY - r.top) / r.height * 3; stop(); diverged = false; w = [a, b]; path = [w.slice()]; draw(); });
+  path = [w.slice()]; draw(); REDRAW.push(draw);
+})();
+</script>
+<script>
+/* ================= 2. Стек линейных слоёв ================= */
+(function(){
+  const view = new ClassifierView($('linCanvas'));
+  let ds = 'xor', act = 'none', model, data, epochs = 0, timer = null, seedCounter = 1;
+  function sizes(){ const d = +$('linDepth').value; return [2, ...Array(d - 1).fill(8), 1]; }
+  function build(){ stop(); data = DATASETS[ds].gen(rng(11), 180, 0.12); model = new MLP(sizes(), act, 1, 100 + seedCounter++); epochs = 0; render(); }
+  function effective(){
+    // W_eff = W_n … W_1 (1×2), b_eff accumulated
+    let We = [[1,0],[0,1]], be = [0,0]; // as 2×2 identity then multiply
+    let cur = {rows: 2, W: [1,0,0,1], b: [0,0]};
+    for(let l = 0; l < model.L; l++){
+      const fin = model.sizes[l], fout = model.sizes[l+1], W = model.W[l], b = model.b[l];
+      const nW = new Float64Array(fout * 2), nb = new Float64Array(fout);
+      for(let i = 0; i < fout; i++){ for(let k = 0; k < 2; k++){ let s = 0; for(let j = 0; j < fin; j++) s += W[i * fin + j] * cur.W[j * 2 + k]; nW[i * 2 + k] = s; } let sb = b[i]; for(let j = 0; j < fin; j++) sb += W[i * fin + j] * cur.b[j]; nb[i] = sb; }
+      cur = {rows: fout, W: nW, b: nb};
+    }
+    return {W: [cur.W[0], cur.W[1]], b: cur.b[0]};
+  }
+  function render(){
+    view.draw(model, data);
+    const ev = model.evaluate(data);
+    $('linEp').textContent = epochs; $('linLoss').textContent = ev.loss.toFixed(3); $('linAcc').textContent = Math.round(ev.acc * 100) + ' %';
+    const d = +$('linDepth').value; $('linDepthV').textContent = d; $('linDepthLabel').textContent = d;
+    if(act === 'none'){
+      const e = effective();
+      $('linW').textContent = `W = [ ${e.W[0].toFixed(3)}   ${e.W[1].toFixed(3)} ]      b = ${e.b.toFixed(3)}\nграница: ${e.W[0].toFixed(2)}·x₁ + ${e.W[1].toFixed(2)}·x₂ + ${e.b.toFixed(2)} = 0`;
+      $('linNote').innerHTML = d === 1 ? 'Один линейный слой: логистическая регрессия. Граница — прямая.' : `${d} линейных слоёв по 8 нейронов, ${model.nParams()} параметров — и всё это тождественно равно одной прямой с тремя числами. Больше параметров, та же модель.`;
+    } else {
+      $('linW').textContent = 'свёртка невозможна: между слоями стоит tanh';
+      $('linNote').innerHTML = d === 1 ? 'Один слой: активация есть только на выходе, граница всё ещё прямая — нелинейность должна стоять <i>между</i> слоями.' : `${d} слоёв с tanh между ними: граница может быть любой формы. Нелинейность и есть вся разница.`;
+    }
+  }
+  function stop(){ if(timer){ cancelAnimationFrame(timer); timer = null; } $('linRun').setAttribute('aria-pressed', 'false'); $('linRun').textContent = 'Обучать'; }
+  function loop(){ for(let i = 0; i < 2; i++){ model.epoch(data, 0.05, 16); epochs++; } render(); if(epochs < 600) timer = requestAnimationFrame(loop); else stop(); }
+  Object.keys(DATASETS).forEach(k => { const b = el('button', null, DATASETS[k].name); b.setAttribute('aria-pressed', k === ds); b.onclick = () => { ds = k; Array.from($('linDs').children).forEach(x => x.setAttribute('aria-pressed', x === b)); build(); }; $('linDs').appendChild(b); });
+  Array.from($('linAct').children).forEach(b => b.onclick = () => { act = b.dataset.a; Array.from($('linAct').children).forEach(x => x.setAttribute('aria-pressed', x === b)); build(); });
+  $('linDepth').addEventListener('input', build);
+  $('linRun').onclick = () => { if(timer) stop(); else { $('linRun').setAttribute('aria-pressed', 'true'); $('linRun').textContent = 'Стоп'; timer = requestAnimationFrame(loop); } };
+  $('linReset').onclick = build;
+  build(); REDRAW.push(() => render());
+})();
+
+/* ================= 3. Конструктор сети + галерея нейронов ================= */
+(function(){
+  const view = new ClassifierView($('pgCanvas'));
+  let ds = 'xor', model, data, epochs = 0, timer = null, sel = -1, seedCounter = 1;
+  const G = 28, cells = [];
+  function arch(){ const v = $('pgArch').value; return v ? v.split(',').map(Number) : []; }
+  function build(){ stop(); data = DATASETS[ds].gen(rng(23), 200, +$('pgNoise').value); model = new MLP([2, ...arch(), 1], $('pgAct').value, 1, 300 + seedCounter++); epochs = 0; sel = -1; view.line = null; buildGallery(); render(); }
+  function buildGallery(){
+    const g = $('pgGallery'); g.innerHTML = ''; cells.length = 0;
+    const h = arch()[0] || 0;
+    if(!h){ g.innerHTML = '<span class="pill">скрытых слоёв нет — линейная модель</span>'; return; }
+    for(let j = 0; j < h; j++){
+      const d = el('div', 'gcell'); d.setAttribute('role', 'button'); d.setAttribute('aria-pressed', 'false'); d.setAttribute('tabindex', '0');
+      const cv = document.createElement('canvas'); cv.width = G; cv.height = G; cv.setAttribute('aria-label', 'активация нейрона ' + (j + 1));
+      const s = el('span', null, 'h' + (j + 1)); d.appendChild(cv); d.appendChild(s); g.appendChild(d); cells.push({d, cv, s});
+      const pick = () => { sel = sel === j ? -1 : j; render(); };
+      d.onclick = pick; d.onkeydown = e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); pick(); } };
+    }
+  }
+  function drawGallery(){
+    if(!cells.length) return;
+    const fin = 2, W = model.W[0], b = model.b[0], f = model.act.f;
+    const base = hexRgb(cssVar('--surface-2')), hi = hexRgb(cssVar('--fwd'));
+    // per-neuron max activation over the data (for normalisation and dead detection)
+    const maxAct = cells.map((_, j) => { let m = -Infinity, mn = Infinity; for(const [x] of data){ const a = f(W[j*2] * x[0] + W[j*2+1] * x[1] + b[j]); m = Math.max(m, a); mn = Math.min(mn, a); } return [mn, m]; });
+    cells.forEach(({d, cv, s}, j) => {
+      const g = cv.getContext('2d'), img = g.createImageData(G, G);
+      const [mn, mx] = maxAct[j]; const dead = (mx - mn) < 1e-3;
+      for(let iy = 0; iy < G; iy++) for(let ix = 0; ix < G; ix++){
+        const x0 = -RANGE + (ix + .5) / G * 2 * RANGE, y0 = RANGE - (iy + .5) / G * 2 * RANGE;
+        const a = f(W[j*2] * x0 + W[j*2+1] * y0 + b[j]);
+        let t = model.actName === 'tanh' ? (a + 1) / 2 : model.actName === 'sigmoid' ? a : Math.min(1, a / Math.max(1e-6, mx));
+        if(dead) t = 0;
+        const k = (iy * G + ix) * 4; img.data[k] = base[0] + (hi[0] - base[0]) * t; img.data[k+1] = base[1] + (hi[1] - base[1]) * t; img.data[k+2] = base[2] + (hi[2] - base[2]) * t; img.data[k+3] = 255;
+      }
+      g.putImageData(img, 0, 0);
+      d.setAttribute('aria-pressed', sel === j); d.classList.toggle('dead', dead); s.textContent = dead ? 'h' + (j + 1) + ' †' : 'h' + (j + 1);
+      d.title = dead ? 'мёртвый нейрон: одинаковый выход на всех точках' : `w = (${W[j*2].toFixed(2)}, ${W[j*2+1].toFixed(2)}), b = ${b[j].toFixed(2)}`;
+    });
+  }
+  function render(){
+    view.line = sel >= 0 && model.L > 1 ? [model.W[0][sel*2], model.W[0][sel*2+1], model.b[0][sel]] : null;
+    view.draw(model, data); drawGallery();
+    const ev = model.evaluate(data);
+    $('pgEp').textContent = epochs; $('pgLoss').textContent = ev.loss.toFixed(3); $('pgAcc').textContent = Math.round(ev.acc * 100) + ' %'; $('pgParams').textContent = model.nParams();
+  }
+  function lr(){ return Math.pow(10, +$('pgLr').value); }
+  function stop(){ if(timer){ cancelAnimationFrame(timer); timer = null; } $('pgRun').setAttribute('aria-pressed', 'false'); $('pgRun').textContent = 'Обучать'; }
+  function loop(){ for(let i = 0; i < 2; i++){ model.epoch(data, lr(), 16); epochs++; } render(); if(epochs < 1500) timer = requestAnimationFrame(loop); else { render(); stop(); } }
+  Object.keys(DATASETS).forEach(k => { const b = el('button', null, DATASETS[k].name); b.setAttribute('aria-pressed', k === ds); b.onclick = () => { ds = k; Array.from($('pgDs').children).forEach(x => x.setAttribute('aria-pressed', x === b)); build(); }; $('pgDs').appendChild(b); });
+  ['pgArch', 'pgAct'].forEach(id => $(id).addEventListener('change', build));
+  $('pgNoise').addEventListener('input', () => { $('pgNoiseV').textContent = (+$('pgNoise').value).toFixed(2); build(); });
+  $('pgLr').addEventListener('input', () => { $('pgLrV').textContent = lr().toFixed(3); });
+  $('pgLrV').textContent = lr().toFixed(3);
+  $('pgRun').onclick = () => { if(timer) stop(); else { $('pgRun').setAttribute('aria-pressed', 'true'); $('pgRun').textContent = 'Стоп'; timer = requestAnimationFrame(loop); } };
+  $('pgStep').onclick = () => { model.epoch(data, lr(), 16); epochs++; render(); };
+  $('pgReset').onclick = build;
+  build(); REDRAW.push(() => render());
+})();
+
+/* ================= 4. Численная производная ================= */
+(function(){
+  const f = x => x * x * Math.sin(3 * x), df = x => 2 * x * Math.sin(3 * x) + 3 * x * x * Math.cos(3 * x);
+  function draw(){
+    const x0 = +$('ndX').value, e = +$('ndH').value, h = Math.pow(10, e);
+    $('ndXV').textContent = x0.toFixed(2); $('ndHV').textContent = h < 1e-3 ? h.toExponential(1) : h.toPrecision(2); $('ndHExp').textContent = e.toFixed(1).replace('-', '−').replace('.0', '');
+    const exact = df(x0), fwd = (f(x0 + h) - f(x0)) / h, cen = (f(x0 + h) - f(x0 - h)) / (2 * h);
+    $('ndExact').textContent = exact.toFixed(6); $('ndFwd').textContent = fwd.toFixed(6); $('ndCen').textContent = cen.toFixed(6);
+    $('ndFwdE').textContent = 'ошибка ' + Math.abs(fwd - exact).toExponential(1); $('ndCenE').textContent = 'ошибка ' + Math.abs(cen - exact).toExponential(1);
+    // left: function, tangent, secant
+    { const {ctx, W, H} = setupCanvas($('ndCanvas')); ctx.clearRect(0, 0, W, H);
+      const pad = {l: 34, r: 12, t: 14, b: 26}, XR = [-2.5, 2.5], YR = [-6, 6];
+      const {x, y} = lineChartFrame(ctx, W, H, pad, XR, YR, {xt: [-2,-1,0,1,2], yt: [-4,0,4], xl: 'x'});
+      ctx.save(); ctx.beginPath(); ctx.rect(pad.l, pad.t, W - pad.l - pad.r, H - pad.t - pad.b); ctx.clip();
+      ctx.strokeStyle = cssVar('--ink-2'); ctx.lineWidth = 2; ctx.beginPath();
+      for(let i = 0; i <= 300; i++){ const xv = XR[0] + i / 300 * 5; i ? ctx.lineTo(x(xv), y(f(xv))) : ctx.moveTo(x(xv), y(f(xv))); } ctx.stroke();
+      const seg = (slope, col, dash) => { ctx.strokeStyle = col; ctx.setLineDash(dash); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x(x0 - 1.2), y(f(x0) + slope * -1.2)); ctx.lineTo(x(x0 + 1.2), y(f(x0) + slope * 1.2)); ctx.stroke(); ctx.setLineDash([]); };
+      seg(exact, cssVar('--fwd'), []); seg(fwd, cssVar('--bwd'), [6, 4]);
+      ctx.fillStyle = cssVar('--ink'); ctx.beginPath(); ctx.arc(x(x0), y(f(x0)), 5, 0, 2*Math.PI); ctx.fill();
+      if(h > 0.02){ ctx.fillStyle = cssVar('--bwd'); ctx.beginPath(); ctx.arc(x(x0 + h), y(f(x0 + h)), 4, 0, 2*Math.PI); ctx.fill(); }
+      ctx.restore(); }
+    // right: error vs h, log-log
+    { const {ctx, W, H} = setupCanvas($('ndErr')); ctx.clearRect(0, 0, W, H);
+      const pad = {l: 44, r: 12, t: 14, b: 26}, XR = [-14, 0], YR = [-13, 1];
+      const {x, y} = lineChartFrame(ctx, W, H, pad, XR, YR, {xt: [-14,-12,-10,-8,-6,-4,-2,0], xf: t => '1e' + t, yt: [-12,-9,-6,-3,0], yf: t => '1e' + t, xl: 'h', yl: '|ошибка|'});
+      const curve = (fn, col) => { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); let started = false;
+        for(let i = 0; i <= 280; i++){ const ee = -14 + i / 280 * 14, hh = Math.pow(10, ee); const err = Math.abs(fn(hh) - exact); const yy = Math.max(YR[0], Math.log10(err + 1e-300)); started ? ctx.lineTo(x(ee), y(yy)) : ctx.moveTo(x(ee), y(yy)); started = true; } ctx.stroke(); };
+      curve(hh => (f(x0 + hh) - f(x0)) / hh, cssVar('--bwd'));
+      curve(hh => (f(x0 + hh) - f(x0 - hh)) / (2 * hh), cssVar('--accent'));
+      // current h marker
+      ctx.strokeStyle = cssVar('--ink-3'); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(x(e), pad.t); ctx.lineTo(x(e), H - pad.b); ctx.stroke(); ctx.setLineDash([]);
+      const mark = (val, col) => { ctx.beginPath(); ctx.arc(x(e), y(Math.max(YR[0], Math.log10(Math.abs(val - exact) + 1e-300))), 5, 0, 2*Math.PI); ctx.fillStyle = col; ctx.fill(); ctx.strokeStyle = cssVar('--surface'); ctx.lineWidth = 2; ctx.stroke(); };
+      mark(fwd, cssVar('--bwd')); mark(cen, cssVar('--accent'));
+      ctx.fillStyle = cssVar('--ink-2'); ctx.font = '11px ' + cssVar('--font-body'); ctx.textAlign = 'left';
+      ctx.fillText('← мешает округление float64', x(-13.7), y(-12.2)); ctx.textAlign = 'right'; ctx.fillText('мешает нелинейность f →', x(-0.3), y(-12.2)); }
+  }
+  ['ndX', 'ndH'].forEach(id => $(id).addEventListener('input', draw));
+  draw(); REDRAW.push(draw);
+})();
+
+/* ================= 5. Вычислительный граф по шагам ================= */
+(function(){
+  const NODES = {
+    x1: {x: 60,  y: 70,  label: 'x₁', op: 'вход'},
+    x2: {x: 60,  y: 190, label: 'x₂', op: 'вход'},
+    x3: {x: 60,  y: 290, label: 'x₃', op: 'вход'},
+    z1: {x: 210, y: 70,  label: 'z₁', op: 'x₁²'},
+    z2: {x: 210, y: 240, label: 'z₂', op: 'x₂ · x₃'},
+    z3: {x: 340, y: 150, label: 'z₃', op: '2 · z₁'},
+    z4: {x: 470, y: 200, label: 'z₄', op: 'z₂ − z₃'},
+    y:  {x: 590, y: 110, label: 'y',  op: 'z₁ · z₄'},
+  };
+  const EDGES = [['x1','z1'],['x2','z2'],['x3','z2'],['z1','z3'],['z1','y'],['z2','z4'],['z3','z4'],['z4','y']];
+  const svg = $('cgSvg'); const NS = 'http://www.w3.org/2000/svg';
+  const mk = (t, a) => { const e = document.createElementNS(NS, t); for(const k in a) e.setAttribute(k, a[k]); return e; };
+  // draw edges then nodes
+  const edgeEls = {}, nodeEls = {};
+  EDGES.forEach(([a, b]) => { const A = NODES[a], B = NODES[b]; const p = mk('path', {class: 'edge', d: `M${A.x + 30},${A.y} C${(A.x + B.x) / 2},${A.y} ${(A.x + B.x) / 2},${B.y} ${B.x - 30},${B.y}`}); svg.appendChild(p); edgeEls[a + '-' + b] = p; });
+  for(const k in NODES){ const n = NODES[k]; const g = mk('g', {class: 'node'});
+    g.appendChild(mk('rect', {x: n.x - 30, y: n.y - 22, width: 60, height: 44, rx: 10}));
+    const t = mk('text', {x: n.x, y: n.y + 5}); t.textContent = n.label; g.appendChild(t);
+    const op = mk('text', {x: n.x, y: n.y - 29, class: 'op'}); op.textContent = n.op; g.appendChild(op);
+    const val = mk('text', {x: n.x, y: n.y + 36, class: 'val'}); g.appendChild(val);
+    const gr = mk('text', {x: n.x, y: n.y + 49, class: 'grad'}); g.appendChild(gr);
+    svg.appendChild(g); nodeEls[k] = {g, val, gr}; }
+
+  let V = {}, D = {}, steps = [], cur = -1, timer = null;
+  const num = v => (Math.round(v * 1000) / 1000).toString();
+  function buildSteps(){
+    const x1 = +$('cgX1').value, x2 = +$('cgX2').value, x3 = +$('cgX3').value;
+    V = {x1, x2, x3}; V.z1 = x1 * x1; V.z2 = x2 * x3; V.z3 = 2 * V.z1; V.z4 = V.z2 - V.z3; V.y = V.z1 * V.z4;
+    D = {}; D.y = 1; D.z4 = D.y * V.z1; D.z3 = D.z4 * (-1); D.z2 = D.z4 * 1; D.z1 = D.y * V.z4 + D.z3 * 2; D.x1 = D.z1 * 2 * x1; D.x2 = D.z2 * x3; D.x3 = D.z2 * x2;
+    steps = [
+      {k: 'f', node: 'x1', edges: [], stored: [], f: `x₁ = ${num(x1)}, x₂ = ${num(x2)}, x₃ = ${num(x3)}`, why: 'Входы графа. Прямой проход идёт от них к выходу.'},
+      {k: 'f', node: 'z1', edges: ['x1-z1'], stored: [], f: `z₁ = x₁² = ${num(x1)}² = <b>${num(V.z1)}</b>`, why: 'Локальная операция: возведение в квадрат. Её производная 2x₁ понадобится на обратном проходе.'},
+      {k: 'f', node: 'z2', edges: ['x2-z2','x3-z2'], stored: [], f: `z₂ = x₂ · x₃ = ${num(x2)} · ${num(x3)} = <b>${num(V.z2)}</b>`, why: 'Умножение: производная по каждому множителю — другой множитель.'},
+      {k: 'f', node: 'z3', edges: ['z1-z3'], stored: [], f: `z₃ = 2 · z₁ = 2 · ${num(V.z1)} = <b>${num(V.z3)}</b>`, why: 'Умножение на константу.'},
+      {k: 'f', node: 'z4', edges: ['z2-z4','z3-z4'], stored: [], f: `z₄ = z₂ − z₃ = ${num(V.z2)} − ${num(V.z3)} = <b>${num(V.z4)}</b>`, why: 'Вычитание: производные +1 и −1.'},
+      {k: 'f', node: 'y', edges: ['z1-y','z4-y'], stored: [], f: `y = z₁ · z₄ = ${num(V.z1)} · ${num(V.z4)} = <b>${num(V.y)}</b>`, why: 'Выход графа. Прямой проход закончен; все значения в узлах сохранены.'},
+      {k: 'b', node: 'y', edges: [], stored: [], f: `dy/dy = <b>1</b>`, why: 'Обратный проход начинается с тривиального шага: производная выхода по самому себе.'},
+      {k: 'b', node: 'z4', edges: ['z4-y'], stored: ['z1'], f: `dy/dz₄ = dy/dy · ∂y/∂z₄ = 1 · z₁ = 1 · ${num(V.z1)} = <b>${num(D.z4)}</b>`, why: 'Локальная производная умножения — второй множитель z₁. Он взят из прямого прохода.'},
+      {k: 'b', node: 'z3', edges: ['z3-z4'], stored: [], f: `dy/dz₃ = dy/dz₄ · ∂z₄/∂z₃ = ${num(D.z4)} · (−1) = <b>${num(D.z3)}</b>`, why: 'Производная вычитаемого равна −1.'},
+      {k: 'b', node: 'z2', edges: ['z2-z4'], stored: [], f: `dy/dz₂ = dy/dz₄ · ∂z₄/∂z₂ = ${num(D.z4)} · 1 = <b>${num(D.z2)}</b>`, why: 'Производная уменьшаемого равна +1.'},
+      {k: 'b', node: 'z1', edges: ['z1-y','z1-z3'], stored: ['z4'], f: `dy/dz₁ = dy/dy · ∂y/∂z₁ + dy/dz₃ · ∂z₃/∂z₁ = 1 · ${num(V.z4)} + (${num(D.z3)}) · 2 = <b>${num(D.z1)}</b>`, why: 'Два пути от z₁ к y — напрямую и через z₃. Вклады складываются. Значение z₄ снова взято из прямого прохода.'},
+      {k: 'b', node: 'x1', edges: ['x1-z1'], stored: ['x1'], f: `dy/dx₁ = dy/dz₁ · ∂z₁/∂x₁ = ${num(D.z1)} · 2x₁ = ${num(D.z1)} · ${num(2 * x1)} = <b>${num(D.x1)}</b>`, why: 'Производная квадрата — 2x₁; сам x₁ хранится с прямого прохода.'},
+      {k: 'b', node: 'x2', edges: ['x2-z2'], stored: ['x3'], f: `dy/dx₂ = dy/dz₂ · ∂z₂/∂x₂ = ${num(D.z2)} · x₃ = ${num(D.z2)} · ${num(x3)} = <b>${num(D.x2)}</b>`, why: 'Производная произведения по x₂ — это x₃.'},
+      {k: 'b', node: 'x3', edges: ['x3-z2'], stored: ['x2'], f: `dy/dx₃ = dy/dz₂ · ∂z₂/∂x₃ = ${num(D.z2)} · x₂ = ${num(D.z2)} · ${num(x2)} = <b>${num(D.x3)}</b>`, why: 'Готово: градиент по всем входам за один обратный проход, каждое ребро обработано ровно один раз.'},
+    ];
+  }
+  function render(){
+    // reset classes
+    for(const k in nodeEls){ nodeEls[k].g.setAttribute('class', 'node'); nodeEls[k].val.textContent = ''; nodeEls[k].gr.textContent = ''; }
+    for(const k in edgeEls) edgeEls[k].setAttribute('class', 'edge');
+    const stored = new Set();
+    steps.forEach((s, i) => {
+      if(i > cur) return;
+      const n = nodeEls[s.node];
+      if(s.k === 'f'){ n.g.classList.add('done-f'); if(s.node === 'x1'){ ['x1','x2','x3'].forEach(q => { nodeEls[q].val.textContent = num(V[q]); nodeEls[q].g.classList.add('done-f'); }); } else n.val.textContent = num(V[s.node]); }
+      else { n.g.classList.add('done-b'); n.gr.textContent = 'dy/d = ' + num(D[s.node]); s.stored.forEach(q => stored.add(q)); }
+      s.edges.forEach(e => edgeEls[e].setAttribute('class', 'edge ' + (i === cur ? s.k : '')));
+    });
+    stored.forEach(q => nodeEls[q].g.classList.add('stored'));
+    if(cur >= 0){ nodeEls[steps[cur].node].g.classList.add('cur'); steps[cur].edges.forEach(e => edgeEls[e].setAttribute('class', 'edge ' + steps[cur].k)); }
+    // fix gradient labels: show as "∂y/∂z = v"
+    for(const k in nodeEls){ if(nodeEls[k].gr.textContent) nodeEls[k].gr.textContent = 'dy/d' + NODES[k].label + ' = ' + num(D[k]); }
+    const info = $('cgInfo');
+    if(cur < 0) info.innerHTML = '<div class="k">старт</div>Нажмите «Вперёд»: сначала прямой проход (6 шагов), затем обратный (8 шагов).';
+    else { const s = steps[cur]; info.innerHTML = `<div class="k">${s.k === 'f' ? 'прямой проход' : 'обратный проход'} · шаг ${cur + 1} из ${steps.length}</div><div class="m" style="white-space:normal;font-size:1.1rem">${s.f}</div><div style="margin-top:.4rem;color:var(--ink-2);font-size:.88rem">${s.why}</div>`; }
+    const log = $('cgLog'); log.innerHTML = '';
+    steps.forEach((s, i) => { if(i > cur) return; const d = el('div', 'st ' + s.k + (i === cur ? ' cur' : '')); d.innerHTML = `<span class="i">${s.k === 'f' ? 'F' : 'B'}${i < 6 ? i + 1 : i - 5}</span><span class="m">${s.f}</span>`; log.appendChild(d); });
+    log.scrollTop = log.scrollHeight;
+    $('cgPrev').disabled = cur < 0; $('cgNext').disabled = cur >= steps.length - 1;
+    const chk = $('cgCheck');
+    if(cur >= steps.length - 1){ const x1 = V.x1, x2 = V.x2, x3 = V.x3; const an = [2*x1*x2*x3 - 8*x1**3, x1*x1*x3, x1*x1*x2]; const ok = Math.abs(an[0] - D.x1) < 1e-9 && Math.abs(an[1] - D.x2) < 1e-9 && Math.abs(an[2] - D.x3) < 1e-9; chk.className = 'pill ' + (ok ? 'ok' : 'bad'); chk.textContent = `сверка с аналитикой: (${num(an[0])}, ${num(an[1])}, ${num(an[2])}) — ${ok ? 'совпало' : 'расхождение'}`; }
+    else { chk.className = 'pill'; chk.textContent = `∇f при x = (${num(V.x1)}, ${num(V.x2)}, ${num(V.x3)})`; }
+  }
+  function stopAuto(){ if(timer){ clearInterval(timer); timer = null; } $('cgAuto').setAttribute('aria-pressed', 'false'); }
+  $('cgNext').onclick = () => { if(cur < steps.length - 1){ cur++; render(); } };
+  $('cgPrev').onclick = () => { if(cur >= 0){ cur--; render(); } };
+  $('cgReset').onclick = () => { stopAuto(); cur = -1; buildSteps(); render(); };
+  $('cgAuto').onclick = () => { if(timer) return stopAuto(); if(cur >= steps.length - 1) cur = -1; $('cgAuto').setAttribute('aria-pressed', 'true'); timer = setInterval(() => { if(cur < steps.length - 1){ cur++; render(); } else stopAuto(); }, 1300); };
+  ['cgX1','cgX2','cgX3'].forEach(id => $(id).addEventListener('input', () => { stopAuto(); const keep = cur; buildSteps(); cur = Math.min(keep, steps.length - 1); render(); }));
+  buildSteps(); render();
+})();
+</script>
+<script>
+/* ================= 6. Куда доходит градиент ================= */
+(function(){
+  const data = DATASETS.circles.gen(rng(5), 200, 0.1);
+  let model, seedCounter = 1, trained = 0;
+  function build(){ const d = +$('gnDepth').value; $('gnDepthV').textContent = d; $('gnDepthLabel').textContent = d; model = new MLP([2, ...Array(d).fill(16), 1], $('gnAct').value, +$('gnInit').value, 500 + seedCounter++); trained = 0; render(); }
+  function norms(){ const g = model.grads(data); return g.dW.map(w => { let s = 0; for(let i = 0; i < w.length; i++) s += w[i] * w[i]; return Math.sqrt(s); }); }
+  function render(){
+    const ns = norms(); const LO = -6, HI = 1;
+    const bars = $('gnBars'), labels = $('gnLabels'); bars.innerHTML = ''; labels.innerHTML = '';
+    ns.forEach((n, i) => {
+      const lg = Math.log10(Math.max(n, 1e-12)); const h = Math.max(0.5, Math.min(100, (lg - LO) / (HI - LO) * 100));
+      const b = el('div', 'lbar'); const bar = el('i'); bar.style.height = h + '%'; bar.style.background = i === ns.length - 1 ? 'var(--accent)' : 'var(--bwd)'; bar.title = `слой ${i + 1}: ‖∂L/∂W‖ = ${fmtSci(n)}`;
+      const lab = el('b', null, fmtSci(n)); lab.style.top = `calc(${100 - h}% - 1.1rem)`;
+      b.appendChild(lab); b.appendChild(bar); bars.appendChild(b);
+      labels.appendChild(el('span', null, i === ns.length - 1 ? 'W' + (i + 1) + ' вых' : 'W' + (i + 1)));
+    });
+    $('gnRatio').textContent = fmtSci(ns[0] / ns[ns.length - 1]);
+    const ev = model.evaluate(data); $('gnLoss').textContent = ev.loss.toFixed(3); $('gnAcc').textContent = Math.round(ev.acc * 100) + ' %';
+    $('gnLossS').textContent = trained ? `после ${trained} шагов` : 'до обучения';
+    const act = $('gnAct').value, d = +$('gnDepth').value, r = ns[0] / ns[ns.length - 1];
+    let note;
+    if(r < 1e-3) note = `Первый слой получает градиент в ${fmtSci(1 / r)} раз меньше последнего. При таком отношении слои у входа фактически не учатся: сеть глубокая на бумаге и мелкая на деле.`;
+    else if(r < 0.1) note = `Градиент затухает к входу (в ${fmtSci(1 / r)} раз). Обучение пойдёт, но первые слои будут отставать.`;
+    else if(r > 10) note = `Градиент растёт к входу (в ${fmtSci(r)} раз) — взрыв градиента. Большая инициализация или активация с производной больше 1. Обычно лечится масштабом инициализации и нормализацией.`;
+    else note = `Нормы по слоям одного порядка — градиент доходит до входа. ${act === 'relu' ? 'ReLU: производная 1 на активных нейронах; половина выключена, но оставшиеся передают сигнал без потерь.' : ''}`;
+    if(act === 'sigmoid' && d >= 4) note += ' Sigmoid: каждый слой умножает на σ′ ≤ 0.25.';
+    $('gnNote').textContent = note;
+  }
+  $('gnTrain').onclick = () => { const r = rng(77 + trained); for(let s = 0; s < 200; s++){ const batch = []; for(let i = 0; i < 20; i++) batch.push(data[Math.floor(r() * data.length)]); model.step(batch, 0.1); } trained += 200; render(); };
+  $('gnReset').onclick = build;
+  ['gnAct','gnInit'].forEach(id => $(id).addEventListener('change', build)); $('gnDepth').addEventListener('input', build);
+  build();
+})();
+
+/* ================= 7. Активации и произведение производных ================= */
+(function(){
+  const ORDER = ['sigmoid', 'tanh', 'relu', 'lrelu'];
+  const COL = {sigmoid: '--bwd', tanh: '--ca', relu: '--fwd', lrelu: '--cb'};
+  let cur = 'sigmoid';
+  const alpha = () => +$('aeAlpha').value;
+  const F = {
+    sigmoid: {f: x => 1/(1+Math.exp(-x)), d: x => { const s = 1/(1+Math.exp(-x)); return s*(1-s); }},
+    tanh:    {f: Math.tanh, d: x => 1 - Math.tanh(x)**2},
+    relu:    {f: x => Math.max(0, x), d: x => x > 0 ? 1 : 0},
+    lrelu:   {f: x => x > 0 ? x : alpha() * x, d: x => x > 0 ? 1 : alpha()},
+  };
+  ORDER.forEach(k => { const b = el('button', null, ACTS[k].name); b.setAttribute('aria-pressed', k === cur); b.onclick = () => { cur = k; Array.from($('aeBtns').children).forEach(x => x.setAttribute('aria-pressed', x === b)); draw(); }; $('aeBtns').appendChild(b); });
+  $('aeLegend').innerHTML = ORDER.map(k => `<span><i class="ln" style="background:var(${COL[k]})"></i>${ACTS[k].name}</span>`).join('');
+  function drawFn(){
+    const {ctx, W, H} = setupCanvas($('aeCanvas')); ctx.clearRect(0, 0, W, H);
+    const pad = {l: 34, r: 12, t: 14, b: 26}, XR = [-5, 5], YR = [-1.2, 2.5];
+    const {x, y} = lineChartFrame(ctx, W, H, pad, XR, YR, {xt: [-4,-2,0,2,4], yt: [-1,0,1,2], xl: 'x'});
+    ctx.save(); ctx.beginPath(); ctx.rect(pad.l, pad.t, W - pad.l - pad.r, H - pad.t - pad.b); ctx.clip();
+    const fn = F[cur];
+    const plot = (g, col, dash) => { ctx.strokeStyle = col; ctx.lineWidth = 2.2; ctx.setLineDash(dash); ctx.beginPath(); for(let i = 0; i <= 400; i++){ const xv = -5 + i / 40; i ? ctx.lineTo(x(xv), y(g(xv))) : ctx.moveTo(x(xv), y(g(xv))); } ctx.stroke(); ctx.setLineDash([]); };
+    plot(fn.f, cssVar('--fwd'), []); plot(fn.d, cssVar('--bwd'), [6, 4]);
+    // guide at 0.25 for sigmoid
+    if(cur === 'sigmoid'){ ctx.strokeStyle = rgba('--bwd', .5); ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(pad.l, y(.25)); ctx.lineTo(W - pad.r, y(.25)); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = cssVar('--bwd'); ctx.font = '11px ' + cssVar('--font-mono'); ctx.textAlign = 'left'; ctx.fillText('σ′ ≤ 0.25', x(2.6), y(.25) - 5); }
+    ctx.restore();
+    let mx = 0; for(let i = 0; i <= 2000; i++){ mx = Math.max(mx, fn.d(-10 + i / 100)); }
+    $('aeMax').textContent = mx.toFixed(2); $('aeFar').textContent = `${fn.d(5).toExponential(1)} / ${fn.d(-5).toExponential(1)}`;
+    $('aeAlphaV').textContent = alpha().toFixed(2);
+  }
+  function drawProd(){
+    const s = +$('aeS').value; $('aeSV').textContent = s.toFixed(1);
+    const {ctx, W, H} = setupCanvas($('aeProd')); ctx.clearRect(0, 0, W, H);
+    const pad = {l: 44, r: 70, t: 14, b: 26}, K = 20, XR = [1, K], YR = [-8, 0.5];
+    const {x, y} = lineChartFrame(ctx, W, H, pad, XR, YR, {xt: [1,5,10,15,20], yt: [-8,-6,-4,-2,0], yf: t => '1e' + t, xl: 'слоёв k', yl: '∏ √E[σ′(uᵢ)²] — множитель нормы градиента'});
+    const r = rng(42), N = 300; const ends = [];
+    ORDER.forEach(k => {
+      const fn = F[k]; const med = []; let acc = 1;
+      for(let layer = 1; layer <= K; layer++){ let m2 = 0; for(let i = 0; i < N; i++){ const d = fn.d(gauss(r) * s); m2 += d * d; } acc *= Math.sqrt(m2 / N); med.push(acc); }
+      ctx.strokeStyle = cssVar(COL[k]); ctx.lineWidth = k === cur ? 3 : 2; ctx.globalAlpha = k === cur ? 1 : .8; ctx.beginPath();
+      med.forEach((m, i) => { const yy = Math.max(YR[0], Math.log10(m + 1e-300)); i ? ctx.lineTo(x(i + 1), y(yy)) : ctx.moveTo(x(i + 1), y(yy)); }); ctx.stroke(); ctx.globalAlpha = 1;
+      const last = Math.max(YR[0], Math.log10(med[K - 1] + 1e-300));
+      ctx.beginPath(); ctx.arc(x(K), y(last), 4, 0, 2*Math.PI); ctx.fillStyle = cssVar(COL[k]); ctx.fill();
+      ends.push({k, py: y(last)});
+    });
+    // direct labels, pushed apart so they never overlap
+    ends.sort((a, b) => a.py - b.py);
+    for(let i = 1; i < ends.length; i++) if(ends[i].py - ends[i-1].py < 13) ends[i].py = ends[i-1].py + 13;
+    for(let i = ends.length - 1; i >= 0; i--){ const lim = H - pad.b - 2; if(ends[i].py > lim) ends[i].py = lim; if(i < ends.length - 1 && ends[i+1].py - ends[i].py < 13) ends[i].py = ends[i+1].py - 13; }
+    ctx.fillStyle = cssVar('--ink-2'); ctx.font = '11px ' + cssVar('--font-body'); ctx.textAlign = 'left';
+    ends.forEach(e => ctx.fillText(ACTS[e.k].name, x(K) + 9, e.py + 4));
+  }
+  function draw(){ drawFn(); drawProd(); }
+  ['aeAlpha', 'aeS'].forEach(id => $(id).addEventListener('input', draw));
+  draw(); REDRAW.push(draw);
+})();
+</script>
+<script>
+/* ---------- вопросы в зал: ответ по клику ---------- */
+document.querySelectorAll('.ask .reveal').forEach(b => { b.addEventListener('click', () => { const a = b.parentElement.querySelector('.ans'); const open = a.hidden; a.hidden = !open; b.textContent = open ? 'скрыть' : 'ответ'; }); });
+
+/* ---------- напоминание: градиент линейной модели на трёх объектах ---------- */
+(function(){
+  const X = [[1, 2], [2, -1], [-1, 1]], Y = [1, 0, 2];
+  function render(){
+    const w = [+$('lgW1').value, +$('lgW2').value]; const tb = $('lgTable').querySelector('tbody'); tb.innerHTML = '';
+    let g = [0, 0], Q = 0;
+    X.forEach((x, i) => { const p = w[0]*x[0] + w[1]*x[1], r = p - Y[i]; g[0] += 2*r*x[0]; g[1] += 2*r*x[1]; Q += r*r;
+      tb.appendChild(el('tr', null, `<td>${i+1}</td><td class="num">(${x[0]}, ${x[1]})</td><td class="num">${Y[i]}</td><td class="num">${p.toFixed(2)}</td><td class="num">${r.toFixed(2)}</td><td class="num">(${(r*x[0]).toFixed(2)}, ${(r*x[1]).toFixed(2)})</td>`)); });
+    $('lgResult').textContent = `Q(w) = ${(Q/3).toFixed(3)}    ∇Q = (2/3) · Σ rᵢ·xᵢ = (${(g[0]/3).toFixed(3)}, ${(g[1]/3).toFixed(3)})    → шаг: w ← w − η·∇Q`;
+  }
+  ['lgW1','lgW2'].forEach(id => $(id).addEventListener('input', render)); render();
+})();
+
+/* ---------- схема полносвязной сети 3→4→4→1 ---------- */
+(function(){
+  const svg = document.querySelector('#netFig svg'); const NS = 'http://www.w3.org/2000/svg';
+  const mk = (t, a, txt) => { const e = document.createElementNS(NS, t); for(const k in a) e.setAttribute(k, a[k]); if(txt != null) e.textContent = txt; return e; };
+  const layers = [3, 4, 4, 1], xs = [80, 240, 400, 560], names = ['x', 'z₁', 'z₂', 'y'], H = 260;
+  const pos = layers.map((n, li) => Array.from({length: n}, (_, i) => [xs[li], 40 + (i + .5) * (H - 60) / n]));
+  for(let l = 0; l < layers.length - 1; l++) pos[l].forEach(a => pos[l+1].forEach(b => svg.appendChild(mk('line', {x1: a[0] + 14, y1: a[1], x2: b[0] - 14, y2: b[1], stroke: 'var(--line-2)', 'stroke-width': 1}))));
+  pos.forEach((P, li) => {
+    P.forEach((p, i) => { svg.appendChild(mk('circle', {cx: p[0], cy: p[1], r: 14, fill: li === 0 ? 'var(--surface-2)' : li === layers.length - 1 ? 'var(--warm-soft)' : 'var(--fwd-soft)', stroke: li === 0 ? 'var(--line-2)' : li === layers.length - 1 ? 'var(--warm)' : 'var(--fwd)', 'stroke-width': 1.5}));
+      const lab = li === 0 ? `x${'₁₂₃'[i]}` : li === layers.length - 1 ? 'ŷ' : `${'₁₂₃₄'[i]}`;
+      const t = mk('text', {x: p[0], y: p[1] + 4, 'text-anchor': 'middle', style: 'font-family:var(--font-head);font-style:italic;font-size:12px;fill:var(--ink)'}, lab); svg.appendChild(t); });
+    svg.appendChild(mk('text', {x: P[0][0], y: 22, 'text-anchor': 'middle', style: 'font-family:var(--font-head);font-style:italic;font-size:15px;fill:var(--ink)'}, names[li] + (li === 0 ? ' ∈ ℝ³' : li < 3 ? ' ∈ ℝ⁴' : '')));
+    svg.appendChild(mk('text', {x: P[0][0], y: H - 8, 'text-anchor': 'middle', class: 'svgtxt', style: 'font-size:11px'}, li === 0 ? 'вход' : li < 3 ? 'скрытый слой' : 'выход'));
+  });
+  [['W₁, b₁', 160], ['W₂, b₂', 320], ['W₃, b₃', 480]].forEach(([t, x]) => { svg.appendChild(mk('rect', {x: x - 26, y: 8, width: 52, height: 18, rx: 4, fill: 'var(--surface)', stroke: 'var(--line)'})); svg.appendChild(mk('text', {x, y: 21, 'text-anchor': 'middle', style: 'font-family:var(--font-head);font-style:italic;font-size:12px;fill:var(--ink-2)'}, t)); });
+})();
+
+/* ---------- backprop руками: 2 → 2 → 1 ---------- */
+(function(){
+  const NS = 'http://www.w3.org/2000/svg'; const svg = $('bpSvg');
+  const mk = (t, a, txt) => { const e = document.createElementNS(NS, t); for(const k in a) e.setAttribute(k, a[k]); if(txt != null) e.textContent = txt; return e; };
+  const P = {x1: [60, 90], x2: [60, 210], h1: [250, 90], h2: [250, 210], y: [430, 150], L: [520, 150]};
+  const edges = [['x1','h1','w₁₁'],['x2','h1','w₁₂'],['x1','h2','w₂₁'],['x2','h2','w₂₂'],['h1','y','v₁'],['h2','y','v₂'],['y','L','']];
+  const edgeEls = {}, nodeEls = {};
+  edges.forEach(([a, b, lab]) => { const A = P[a], B = P[b]; const p = mk('path', {class: 'edge', d: `M${A[0]+30},${A[1]} L${B[0]-30},${B[1]}`}); svg.appendChild(p); edgeEls[a+'-'+b] = p;
+    if(lab){ const mx = (A[0] + B[0]) / 2 + (a === 'x1' && b === 'h2' ? -30 : a === 'x2' && b === 'h1' ? 30 : 0), my = (A[1] + B[1]) / 2 + (a[0] === 'x' && a[1] !== b[1] ? 0 : -8); svg.appendChild(mk('text', {x: mx, y: my, 'text-anchor': 'middle', style: 'font-family:var(--font-head);font-style:italic;font-size:12px;fill:var(--ink-2)'}, lab)); } });
+  const labels = {x1: 'x₁', x2: 'x₂', h1: 'z₁', h2: 'z₂', y: 'ŷ', L: 'L'}, ops = {x1: 'вход', x2: 'вход', h1: 'σ(u₁), u₁ = w₁₁x₁ + w₁₂x₂ + b₁', h2: 'σ(u₂), u₂ = w₂₁x₁ + w₂₂x₂ + b₂', y: 'v₁z₁ + v₂z₂ + c', L: '½(ŷ − y)²'};
+  for(const k in P){ const [x, y] = P[k]; const g = mk('g', {class: 'node'}); g.appendChild(mk('rect', {x: x - 30, y: y - 22, width: 60, height: 44, rx: 10})); g.appendChild(mk('text', {x, y: y + 5}, labels[k]));
+    g.appendChild(mk('text', {x: k === 'h1' || k === 'h2' ? x : x, y: y - 29, class: 'op'}, ops[k])); const val = mk('text', {x, y: y + 36, class: 'val'}); const gr = mk('text', {x, y: y + 49, class: 'grad'}); g.appendChild(val); g.appendChild(gr); svg.appendChild(g); nodeEls[k] = {g, val, gr}; }
+  const ACT = {relu: {f: u => Math.max(0, u), d: u => u > 0 ? 1 : 0}, sigmoid: {f: u => 1/(1+Math.exp(-u)), d: u => { const s = 1/(1+Math.exp(-u)); return s*(1-s); }}, tanh: {f: Math.tanh, d: u => 1 - Math.tanh(u)**2}};
+  const n = v => (Math.round(v * 1000) / 1000).toString();
+  const g = id => +$('bp_' + id).value;
+  let steps = [], cur = -1, quiz = false, R = {};
+  function compute(){
+    const x = [g('x1'), g('x2')], W = [[g('w11'), g('w12')], [g('w21'), g('w22')]], b = [g('b1'), g('b2')], v = [g('v1'), g('v2')], c = g('c'), y = g('y'), A = ACT[$('bp_act').value], an = $('bp_act').options[$('bp_act').selectedIndex].text;
+    const u = [W[0][0]*x[0] + W[0][1]*x[1] + b[0], W[1][0]*x[0] + W[1][1]*x[1] + b[1]], z = u.map(A.f), yh = v[0]*z[0] + v[1]*z[1] + c, E = .5*(yh - y)**2;
+    const dyh = yh - y, dv = [dyh*z[0], dyh*z[1]], dc = dyh, dz = [dyh*v[0], dyh*v[1]], du = [dz[0]*A.d(u[0]), dz[1]*A.d(u[1])], dW = [[du[0]*x[0], du[0]*x[1]], [du[1]*x[0], du[1]*x[1]]], db = du.slice(), dx = [W[0][0]*du[0] + W[1][0]*du[1], W[0][1]*du[0] + W[1][1]*du[1]];
+    R = {x, u, z, yh, E, dyh, dv, dc, dz, du, dW, db, dx, sd: u.map(A.d)};
+    steps = [
+      {k:'f', node:'x1', edges:[], f:`x = (${n(x[0])}, ${n(x[1])}), y = ${n(y)}`, why:'Вход и правильный ответ.'},
+      {k:'f', node:'h1', edges:['x1-h1','x2-h1','x1-h2','x2-h2'], f:`u₁ = ${n(W[0][0])}·${n(x[0])} + (${n(W[0][1])})·${n(x[1])} + ${n(b[0])} = <b>${n(u[0])}</b>; &nbsp; u₂ = ${n(W[1][0])}·${n(x[0])} + ${n(W[1][1])}·${n(x[1])} + (${n(b[1])}) = <b>${n(u[1])}</b>`, why:'Аффинная часть слоя: u = W₁x + b₁. Значения u нужно сохранить — от них берётся σ′ на обратном проходе.'},
+      {k:'f', node:'h2', edges:[], f:`z = ${an}(u) = (<b>${n(z[0])}</b>, <b>${n(z[1])}</b>)`, why:'Активация поэлементно. Это скрытое представление.'},
+      {k:'f', node:'y', edges:['h1-y','h2-y'], f:`ŷ = ${n(v[0])}·${n(z[0])} + (${n(v[1])})·${n(z[1])} + ${n(c)} = <b>${n(yh)}</b>`, why:'Выходной слой без активации: ŷ = W₂z + b₂.'},
+      {k:'f', node:'L', edges:['y-L'], f:`L = ½(${n(yh)} − ${n(y)})² = <b>${n(E)}</b>`, why:'Потеря. Прямой проход закончен.'},
+      {k:'b', node:'y', edges:['y-L'], f:`∂L/∂ŷ = ŷ − y = <b>${n(dyh)}</b>`, why:'Старт обратного прохода: производная квадратичной потери по выходу.'},
+      {k:'b', node:'y', edges:['h1-y','h2-y'], f:`∂L/∂W₂ = ∂L/∂ŷ · z = (${n(dyh)}·${n(z[0])}, ${n(dyh)}·${n(z[1])}) = (<b>${n(dv[0])}</b>, <b>${n(dv[1])}</b>); &nbsp; ∂L/∂b₂ = ∂L/∂ŷ = <b>${n(dc)}</b>`, why:'Градиент по параметрам выходного слоя: локальная производная ŷ по vᵢ — это zᵢ. Это первое, что уходит в оптимизатор.'},
+      {k:'b', node:'h2', edges:['h1-y','h2-y'], f:`∂L/∂z = ∂L/∂ŷ · W₂ = (${n(dyh)}·${n(v[0])}, ${n(dyh)}·(${n(v[1])})) = (<b>${n(dz[0])}</b>, <b>${n(dz[1])}</b>)`, why:'Градиент передаётся назад через веса: ∂ŷ/∂zᵢ = vᵢ. Это W₂ᵀ · ∂L/∂ŷ из формулы выше.'},
+      {k:'b', node:'h1', edges:[], f:`∂L/∂u = ∂L/∂z ⊙ σ′(u), &nbsp; σ′(u) = (${n(R.sd[0])}, ${n(R.sd[1])}) &nbsp;⇒&nbsp; (<b>${n(du[0])}</b>, <b>${n(du[1])}</b>)`, why: $('bp_act').value === 'relu' && (u[0] <= 0 || u[1] <= 0) ? 'Вот тот самый множитель σ′(uᵢ). У нейрона с u ≤ 0 он равен нулю — градиент через этот нейрон не проходит, его веса на этом объекте не изменятся.' : 'Вот тот самый множитель σ′(uᵢ) на каждом нейроне.'},
+      {k:'b', node:'x1', edges:['x1-h1','x2-h1','x1-h2','x2-h2'], f:`∂L/∂W₁ = ∂L/∂u · xᵀ = [[${n(dW[0][0])}, ${n(dW[0][1])}], [${n(dW[1][0])}, ${n(dW[1][1])}]]; &nbsp; ∂L/∂b₁ = ∂L/∂u = (<b>${n(db[0])}</b>, <b>${n(db[1])}</b>)`, why:'Градиент по параметрам первого слоя: ∂uᵢ/∂wᵢⱼ = xⱼ, поэтому строка i матрицы — это (∂L/∂uᵢ) · x. Все девять чисел для шага оптимизатора получены.'},
+      {k:'b', node:'x1', edges:[], f:`∂L/∂x = W₁ᵀ · ∂L/∂u = (${n(dx[0])}, ${n(dx[1])})`, why:'Для полноты: градиент по входу. Здесь он никому не нужен (x — данные), но будь перед этим слоем ещё один — именно его мы бы передали дальше назад.'},
+    ];
+  }
+  function render(){
+    for(const k in nodeEls){ nodeEls[k].g.setAttribute('class', 'node'); nodeEls[k].val.textContent = ''; nodeEls[k].gr.textContent = ''; }
+    for(const k in edgeEls) edgeEls[k].setAttribute('class', 'edge');
+    const lim = quiz ? Math.min(cur, 4) : cur;
+    const setVal = (k, t) => nodeEls[k].val.textContent = t, setGr = (k, t) => nodeEls[k].gr.textContent = t;
+    for(let i = 0; i <= lim; i++){ const s = steps[i]; s.edges.forEach(e => edgeEls[e].setAttribute('class', 'edge ' + (i === lim ? s.k : '')));
+      if(i === 0){ setVal('x1', n(R.x[0])); setVal('x2', n(R.x[1])); nodeEls.x1.g.classList.add('done-f'); nodeEls.x2.g.classList.add('done-f'); }
+      if(i === 1){ setVal('h1', 'u=' + n(R.u[0])); setVal('h2', 'u=' + n(R.u[1])); }
+      if(i === 2){ setVal('h1', 'u=' + n(R.u[0]) + ' z=' + n(R.z[0])); setVal('h2', 'u=' + n(R.u[1]) + ' z=' + n(R.z[1])); nodeEls.h1.g.classList.add('done-f'); nodeEls.h2.g.classList.add('done-f'); }
+      if(i === 3){ setVal('y', n(R.yh)); nodeEls.y.g.classList.add('done-f'); }
+      if(i === 4){ setVal('L', n(R.E)); nodeEls.L.g.classList.add('done-f'); }
+      if(i === 5){ setGr('y', '∂L/∂ŷ=' + n(R.dyh)); nodeEls.y.g.classList.add('done-b'); }
+      if(i === 7){ setGr('h1', '∂L/∂z=' + n(R.dz[0])); setGr('h2', '∂L/∂z=' + n(R.dz[1])); }
+      if(i === 8){ setGr('h1', '∂L/∂u=' + n(R.du[0])); setGr('h2', '∂L/∂u=' + n(R.du[1])); nodeEls.h1.g.classList.add('done-b'); nodeEls.h2.g.classList.add('done-b'); }
+      if(i === 10){ setGr('x1', '∂L/∂x=' + n(R.dx[0])); setGr('x2', '∂L/∂x=' + n(R.dx[1])); nodeEls.x1.g.classList.add('done-b'); nodeEls.x2.g.classList.add('done-b'); }
+    }
+    if(lim >= 0) nodeEls[steps[lim].node].g.classList.add('cur');
+    const log = $('bpLog'); log.innerHTML = '';
+    if(cur < 0) log.appendChild(el('div', 'stepinfo', '<div class="k">старт</div>Нажмите «Дальше»: пять шагов прямого прохода, шесть — обратного.'));
+    for(let i = 0; i <= lim; i++){ const s = steps[i]; const d = el('div', 'st ' + s.k + (i === lim ? ' cur' : '')); d.innerHTML = `<span class="i">${s.k === 'f' ? 'F' : 'B'}${i < 5 ? i + 1 : i - 4}</span><span><span class="m" style="white-space:normal">${s.f}</span>${i === lim ? `<div style="margin-top:.3rem;color:var(--ink-2);font-size:.84rem">${s.why}</div>` : ''}</span>`; log.appendChild(d); }
+    if(quiz && cur > 4) log.appendChild(el('div', 'note', 'Обратный проход скрыт — считайте сами. «Показать всё» откроет решение.'));
+    $('bpPrev').disabled = cur < 0; $('bpNext').disabled = cur >= steps.length - 1;
+  }
+  $('bpNext').onclick = () => { if(cur < steps.length - 1){ cur++; render(); } };
+  $('bpPrev').onclick = () => { if(cur >= 0){ cur--; render(); } };
+  $('bpAll').onclick = () => { quiz = false; $('bpQuiz').setAttribute('aria-pressed', 'false'); $('bpQuizBox').hidden = true; cur = steps.length - 1; render(); };
+  $('bpQuiz').onclick = () => { quiz = !quiz; $('bpQuiz').setAttribute('aria-pressed', quiz); $('bpQuizBox').hidden = !quiz; if(quiz) cur = 4; render(); };
+  $('bpCheck').onclick = () => { const want = {dv1: R.dv[0], dv2: R.dv[1], dc: R.dc, dw11: R.dW[0][0], dw12: R.dW[0][1], dw21: R.dW[1][0], dw22: R.dW[1][1], db1: R.db[0], db2: R.db[1]}; let ok = 0, tot = 0;
+    document.querySelectorAll('#bpQuizBox input').forEach(inp => { tot++; const v = parseFloat(inp.value); const good = isFinite(v) && Math.abs(v - want[inp.dataset.q]) <= 0.01 + 0.01 * Math.abs(want[inp.dataset.q]); inp.classList.toggle('ok', good); inp.classList.toggle('bad', !good); if(good) ok++; });
+    const r = $('bpQuizRes'); r.className = 'pill ' + (ok === tot ? 'ok' : 'warn'); r.textContent = ok === tot ? 'всё верно' : `верно ${ok} из ${tot}`; };
+  document.querySelectorAll('#bp input[type=number], #bp_act').forEach(i => { if(i.closest('#bpQuizBox')) return; i.addEventListener('input', () => { compute(); cur = Math.min(cur, steps.length - 1); render(); }); });
+  compute(); render();
+})();
+</script>
+</body>
+</html>
