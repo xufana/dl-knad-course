@@ -6,7 +6,7 @@
 
 1. Week 1: MLP, chain-rule. Intro to torch. Context: [lecture](/week01/lecture1_mlp.html), [seminar](/week01/sem01_pytorch_intro.ipynb)
 2. Week 2: Функции потерь, Dropout, Batch Normalization. Полный training loop + введение трекера экспериментов (конфиги, seeds, воспроизводимость). Context: lecture, seminar
-
+4. Week4: Операция свертки, виды сверток. Context: [lecture](/week04/lecture.html), [seminar](/week04/week01/sem01_pytorch_intro.ipynb)
 ## Assignments
 
 Подробности по проекту и темы можно найти тут: [project.md](/project.md)
