@@ -71,10 +71,11 @@ jobs:
               groups.setdefault(folder, []).append(file)
 
           def natural_key(value):
-              return [
-                  int(part) if part.isdigit() else part.lower()
-                  for part in re.split(r"(\d+)", value)
-              ]
+            value = str(value)
+            return [
+                int(part) if part.isdigit() else part.lower()
+                for part in re.split(r"(\d+)", value)
+            ]
 
           def folder_title(folder):
               match = re.search(
