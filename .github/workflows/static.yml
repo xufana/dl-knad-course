@@ -1,3 +1,4 @@
+
 name: Deploy static content to Pages
 
 on:
@@ -27,17 +28,62 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
-      - name: Find HTML files
+      - name: Prepare site
         run: |
-          find . -type f -name "*.html"
+          mkdir -p dist
+
+          # Копируем содержимое репозитория
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='dist' \
+            ./ dist/
+
+          # Создаём главную страницу со списком HTML-файлов
+          python3 - <<'PY'
+          from pathlib import Path
+          from html import escape
+
+          root = Path("dist")
+          files = sorted(
+              p for p in root.rglob("*.html")
+              if p.name.lower() != "index.html"
+              and ".git" not in p.parts
+          )
+
+          links = []
+          for p in files:
+              url = "/" + p.relative_to(root).as_posix()
+              links.append(
+                  f'<li><a href="{escape(url, quote=True)}">'
+                  f'{escape(str(p.relative_to(root)))}</a></li>'
+              )
+
+          page = """<!DOCTYPE html>
+          <html lang="ru">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>HTML Pages</title>
+          </head>
+          <body>
+            <h1>HTML Pages</h1>
+            <ul>
+          """ + "\n".join(links) + """
+            </ul>
+          </body>
+          </html>
+          """
+
+          (root / "index.html").write_text(page, encoding="utf-8")
+          print(f"Found {len(files)} HTML files")
+          PY
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: dist
 
       - name: Deploy to GitHub Pages
         id: deployment
