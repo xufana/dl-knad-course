@@ -20,6 +20,7 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     runs-on: ubuntu-latest
 
     steps:
@@ -33,52 +34,72 @@ jobs:
         run: |
           mkdir -p dist
 
-          # Копируем содержимое репозитория
-          rsync -a \
+          # Копируем все файлы репозитория
+          rsync -av \
             --exclude='.git' \
             --exclude='.github' \
             --exclude='dist' \
             ./ dist/
 
-          # Создаём главную страницу со списком HTML-файлов
+          # Генерируем index.html
           python3 - <<'PY'
           from pathlib import Path
           from html import escape
 
           root = Path("dist")
+
           files = sorted(
               p for p in root.rglob("*.html")
               if p.name.lower() != "index.html"
-              and ".git" not in p.parts
           )
 
-          links = []
-          for p in files:
-              url = "/" + p.relative_to(root).as_posix()
-              links.append(
-                  f'<li><a href="{escape(url, quote=True)}">'
-                  f'{escape(str(p.relative_to(root)))}</a></li>'
-              )
+          html = [
+              "<!DOCTYPE html>",
+              '<html lang="ru">',
+              "<head>",
+              '<meta charset="UTF-8">',
+              '<meta name="viewport" content="width=device-width, initial-scale=1">',
+              "<title>DL KNAD Course</title>",
+              "</head>",
+              "<body>",
+              "<h1>DL KNAD Course</h1>"
+          ]
 
-          page = """<!DOCTYPE html>
-          <html lang="ru">
-          <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>HTML Pages</title>
-          </head>
-          <body>
-            <h1>HTML Pages</h1>
-            <ul>
-          """ + "\n".join(links) + """
-            </ul>
-          </body>
-          </html>
-          """
+          folders = {}
 
-          (root / "index.html").write_text(page, encoding="utf-8")
-          print(f"Found {len(files)} HTML files")
+          for file in files:
+              folder = file.parent.as_posix()
+              folders.setdefault(folder, []).append(file)
+
+          for folder, pages in sorted(folders.items()):
+              html.append(f"<h2>{escape(folder)}</h2>")
+              html.append("<ul>")
+
+              for page in pages:
+                  path = page.relative_to(root).as_posix()
+                  name = page.stem
+
+                  url = "/dl-knad-course/" + path
+
+                  html.append(
+                      f'<li><a href="{escape(url, quote=True)}">'
+                      f'{escape(name)}</a></li>'
+                  )
+
+              html.append("</ul>")
+
+          html.extend(["</body>", "</html>"])
+
+          (root / "index.html").write_text(
+              "\n".join(html),
+              encoding="utf-8"
+          )
+
+          print(f"Generated index with {len(files)} pages")
           PY
+
+      - name: Debug files
+        run: find dist -type f -iname "*.html"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
