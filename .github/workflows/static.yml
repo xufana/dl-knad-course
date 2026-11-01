@@ -25,50 +25,56 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      # 1. Download repository
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Configure GitHub Pages
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      # 3. Prepare website
       - name: Prepare site
         run: |
           mkdir -p dist
 
-          # Copy all repository files
           rsync -a \
             --exclude='.git' \
             --exclude='.github' \
             --exclude='dist' \
             ./ dist/
 
-          # Generate homepage
           python3 - <<'PY'
           from pathlib import Path
           from html import escape
+          from urllib.parse import quote
           import re
 
           root = Path("dist")
 
+          # Find HTML lectures and Jupyter seminars
           files = sorted(
               p for p in root.rglob("*")
               if p.is_file()
-              and p.suffix.lower() == ".html"
+              and p.suffix.lower() in (".html", ".ipynb")
               and p.relative_to(root).as_posix() != "index.html"
           )
 
+          # Group materials by week folder
           groups = {}
 
           for file in files:
-              folder = file.parent.as_posix()
+              relative = file.relative_to(root)
 
-              if folder == ".":
-                  folder = "Materials"
+              if len(relative.parts) > 1:
+                  folder = relative.parts[0]
+              else:
+                  folder = "Материалы"
 
               groups.setdefault(folder, []).append(file)
+
+          def natural_key(value):
+              return [
+                  int(part) if part.isdigit() else part.lower()
+                  for part in re.split(r"(\d+)", value)
+              ]
 
           def folder_title(folder):
               match = re.search(
@@ -78,45 +84,90 @@ jobs:
               )
 
               if match:
-                  return f"Week {int(match.group(1)):02d}"
+                  return f"Неделя {int(match.group(1))}"
+
+              match = re.search(
+                  r'неделя[_ -]?(\d+)',
+                  folder,
+                  re.IGNORECASE
+              )
+
+              if match:
+                  return f"Неделя {int(match.group(1))}"
 
               return folder.replace("_", " ").replace("-", " ").title()
 
-          def page_title(file):
-              return file.stem.replace("_", " ").replace("-", " ").title()
+          def material_title(file, number, total):
+              if file.suffix.lower() == ".ipynb":
+                  label = "Семинар"
+              else:
+                  label = "Лекция"
+
+              if total > 1:
+                  return f"{label} {number}"
+
+              return label
 
           cards = ""
 
-          for folder, pages in sorted(groups.items()):
+          for folder in sorted(groups, key=natural_key):
+              pages = sorted(groups[folder], key=natural_key)
+
+              lectures = [
+                  p for p in pages
+                  if p.suffix.lower() == ".html"
+              ]
+
+              seminars = [
+                  p for p in pages
+                  if p.suffix.lower() == ".ipynb"
+              ]
 
               cards += f"""
               <section class="week">
                 <div class="week-head">
-                  <span class="week-number">
-                    {escape(folder_title(folder))}
-                  </span>
+                  <h2>{escape(folder_title(folder))}</h2>
                   <span class="count">
-                    {len(pages)} materials
+                    {len(lectures)} лекц. · {len(seminars)} сем.
                   </span>
                 </div>
-
-                <div class="links">
+                <div class="materials">
               """
 
-              for page in pages:
-                  url = "./" + page.relative_to(root).as_posix()
-                  name = page_title(page)
+              for material_type, items in [
+                  ("Лекция", lectures),
+                  ("Семинар", seminars)
+              ]:
+                  for i, page in enumerate(items, start=1):
+                      relative = page.relative_to(root).as_posix()
 
-                  cards += f"""
-                  <a class="material"
-                     href="{escape(url, quote=True)}">
+                      if page.suffix.lower() == ".ipynb":
+                          url = (
+                              "https://github.com/xufana/"
+                              "dl-knad-course/blob/main/"
+                              + quote(relative, safe="/")
+                          )
+                      else:
+                          url = "./" + quote(relative, safe="/")
 
-                    <span class="file-icon">↗</span>
-                    <span>{escape(name)}</span>
-                    <span class="arrow">→</span>
+                      title = material_title(
+                          page, i, len(items)
+                      )
 
-                  </a>
-                  """
+                      icon = "▤" if material_type == "Лекция" else "▧"
+
+                      cards += f"""
+                      <a class="material"
+                         href="{escape(url, quote=True)}"
+                         target="_blank"
+                         rel="noopener noreferrer">
+                        <span class="material-icon">{icon}</span>
+                        <span class="material-name">
+                          {escape(title)}
+                        </span>
+                        <span class="arrow">→</span>
+                      </a>
+                      """
 
               cards += """
                 </div>
@@ -124,16 +175,11 @@ jobs:
               """
 
           document = f"""<!DOCTYPE html>
-          <html lang="en">
-
+          <html lang="ru">
           <head>
             <meta charset="UTF-8">
-
             <meta name="viewport"
                   content="width=device-width, initial-scale=1">
-
-            <meta name="description"
-                  content="Deep Learning and Knowledge Analysis course materials">
 
             <title>Deep Learning & Knowledge Analysis</title>
 
@@ -190,7 +236,6 @@ jobs:
 
               .section-title {{
                 font-size: 25px;
-                letter-spacing: -0.7px;
                 margin-bottom: 28px;
               }}
 
@@ -212,23 +257,22 @@ jobs:
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                margin-bottom: 18px;
+                gap: 12px;
+                margin-bottom: 16px;
               }}
 
-              .week-number {{
-                color: #64748b;
-                font-size: 13px;
-                font-weight: 750;
-                letter-spacing: 1px;
-                text-transform: uppercase;
+              .week-head h2 {{
+                font-size: 18px;
+                margin: 0;
               }}
 
               .count {{
                 color: #94a3b8;
                 font-size: 12px;
+                white-space: nowrap;
               }}
 
-              .links {{
+              .materials {{
                 border-top: 1px solid #edf0f4;
               }}
 
@@ -252,7 +296,7 @@ jobs:
                 color: #2563eb;
               }}
 
-              .file-icon {{
+              .material-icon {{
                 color: #3b82f6;
                 font-size: 19px;
               }}
@@ -287,12 +331,10 @@ jobs:
           </head>
 
           <body>
-
             <header class="hero">
               <div class="hero-inner">
-
                 <div class="tag">
-                  Course materials · 2026
+                  Учебные материалы · 2026
                 </div>
 
                 <h1>
@@ -300,28 +342,24 @@ jobs:
                 </h1>
 
                 <p class="subtitle">
-                  Lecture notes, practical sessions and
-                  interactive materials for the course.
+                  Лекции, семинары и практические
+                  материалы курса.
                 </p>
-
               </div>
             </header>
 
             <main>
-
               <h2 class="section-title">
-                Course programme
+                Программа курса
               </h2>
 
-              {cards if cards else "<p>Materials are coming soon.</p>"}
-
+              {cards if cards else "<p>Материалы скоро появятся.</p>"}
             </main>
 
             <footer>
               DEEP LEARNING & KNOWLEDGE ANALYSIS
               · COURSE MATERIALS
             </footer>
-
           </body>
           </html>
           """
@@ -331,22 +369,19 @@ jobs:
               encoding="utf-8"
           )
 
-          print(f"Found {len(files)} HTML files")
-          print(f"Generated {len(groups)} course sections")
+          print(f"Found {len(files)} materials")
+          print(f"Generated {len(groups)} weeks")
+          PY
 
-      # 4. Check published files
       - name: Debug published files
         run: |
-          echo "HTML files:"
-          find dist -type f -iname "*.html"
+          find dist -type f \( -iname "*.html" -o -iname "*.ipynb" \)
 
-      # 5. Upload website
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
-      # 6. Deploy website
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
