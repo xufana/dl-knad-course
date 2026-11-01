@@ -1,111 +1,244 @@
 
-name: Deploy static content to Pages
-
-on:
-  push:
-    branches: ["main"]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
-jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
       - name: Prepare site
         run: |
           mkdir -p dist
 
-          # Копируем все файлы репозитория
-          rsync -av \
+          rsync -a \
             --exclude='.git' \
             --exclude='.github' \
             --exclude='dist' \
             ./ dist/
 
-          # Генерируем index.html
           python3 - <<'PY'
           from pathlib import Path
           from html import escape
+          import re
 
           root = Path("dist")
 
           files = sorted(
               p for p in root.rglob("*.html")
-              if p.name.lower() != "index.html"
+              if p.relative_to(root).as_posix() != "index.html"
           )
 
-          html = [
-              "<!DOCTYPE html>",
-              '<html lang="ru">',
-              "<head>",
-              '<meta charset="UTF-8">',
-              '<meta name="viewport" content="width=device-width, initial-scale=1">',
-              "<title>DL KNAD Course</title>",
-              "</head>",
-              "<body>",
-              "<h1>DL KNAD Course</h1>"
-          ]
-
-          folders = {}
-
+          groups = {}
           for file in files:
               folder = file.parent.as_posix()
-              folders.setdefault(folder, []).append(file)
+              if folder == ".":
+                  folder = "Materials"
+              groups.setdefault(folder, []).append(file)
 
-          for folder, pages in sorted(folders.items()):
-              html.append(f"<h2>{escape(folder)}</h2>")
-              html.append("<ul>")
+          def folder_title(folder):
+              match = re.search(r'week[_ -]?(\d+)', folder, re.I)
+              if match:
+                  return f"Week {int(match.group(1)):02d}"
+              return folder.replace("_", " ").replace("-", " ").title()
+
+          def page_title(file):
+              return file.stem.replace("_", " ").replace("-", " ").title()
+
+          cards = ""
+
+          for folder, pages in sorted(groups.items()):
+              cards += f'''
+              <section class="week">
+                <div class="week-head">
+                  <span class="week-number">{escape(folder_title(folder))}</span>
+                  <span class="count">{len(pages)} materials</span>
+                </div>
+                <div class="links">
+              '''
 
               for page in pages:
-                  path = page.relative_to(root).as_posix()
-                  name = page.stem
+                  url = "./" + page.relative_to(root).as_posix()
+                  name = page_title(page)
 
-                  url = "/dl-knad-course/" + path
+                  cards += f'''
+                  <a class="material" href="{escape(url, quote=True)}">
+                    <span class="file-icon">↗</span>
+                    <span>{escape(name)}</span>
+                    <span class="arrow">→</span>
+                  </a>
+                  '''
 
-                  html.append(
-                      f'<li><a href="{escape(url, quote=True)}">'
-                      f'{escape(name)}</a></li>'
-                  )
+              cards += '''
+                </div>
+              </section>
+              '''
 
-              html.append("</ul>")
+          document = f'''<!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Deep Learning & Knowledge Analysis</title>
 
-          html.extend(["</body>", "</html>"])
+            <style>
+              * {{ box-sizing: border-box; }}
+
+              body {{
+                margin: 0;
+                background: #f5f6fa;
+                color: #172033;
+                font-family: Inter, -apple-system, BlinkMacSystemFont,
+                             "Segoe UI", sans-serif;
+                line-height: 1.6;
+              }}
+
+              .hero {{
+                background: #111827;
+                color: white;
+                padding: 75px 24px 85px;
+              }}
+
+              .hero-inner, main, footer {{
+                max-width: 900px;
+                margin: auto;
+              }}
+
+              .tag {{
+                color: #93c5fd;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 2px;
+                text-transform: uppercase;
+              }}
+
+              h1 {{
+                font-size: clamp(34px, 6vw, 58px);
+                line-height: 1.12;
+                letter-spacing: -2px;
+                max-width: 700px;
+                margin: 22px 0;
+              }}
+
+              .subtitle {{
+                color: #aebbd0;
+                font-size: 17px;
+                max-width: 580px;
+              }}
+
+              main {{
+                padding: 48px 24px;
+              }}
+
+              .section-title {{
+                font-size: 25px;
+                letter-spacing: -0.7px;
+                margin-bottom: 28px;
+              }}
+
+              .week {{
+                background: white;
+                border: 1px solid #e5e9f0;
+                border-radius: 14px;
+                padding: 24px;
+                margin-bottom: 18px;
+                transition: box-shadow .2s, transform .2s;
+              }}
+
+              .week:hover {{
+                box-shadow: 0 8px 28px #1720330c;
+                transform: translateY(-2px);
+              }}
+
+              .week-head {{
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 18px;
+              }}
+
+              .week-number {{
+                color: #64748b;
+                font-size: 13px;
+                font-weight: 750;
+                letter-spacing: 1px;
+                text-transform: uppercase;
+              }}
+
+              .count {{
+                color: #94a3b8;
+                font-size: 12px;
+              }}
+
+              .links {{
+                border-top: 1px solid #edf0f4;
+              }}
+
+              .material {{
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 14px 4px;
+                border-bottom: 1px solid #edf0f4;
+                color: #25344d;
+                text-decoration: none;
+                font-size: 15px;
+                transition: color .2s;
+              }}
+
+              .material:last-child {{
+                border-bottom: 0;
+              }}
+
+              .material:hover {{
+                color: #2563eb;
+              }}
+
+              .file-icon {{
+                color: #3b82f6;
+                font-size: 19px;
+              }}
+
+              .arrow {{
+                margin-left: auto;
+                color: #94a3b8;
+              }}
+
+              footer {{
+                padding: 24px;
+                border-top: 1px solid #e2e8f0;
+                color: #94a3b8;
+                font-size: 12px;
+                text-align: center;
+              }}
+
+              @media(max-width: 600px) {{
+                .hero {{ padding: 55px 22px 65px; }}
+                main {{ padding: 35px 16px; }}
+                .week {{ padding: 18px; }}
+              }}
+            </style>
+          </head>
+
+          <body>
+            <header class="hero">
+              <div class="hero-inner">
+                <div class="tag">Course materials · 2026</div>
+                <h1>Deep Learning & Knowledge Analysis</h1>
+                <p class="subtitle">
+                  Lecture notes, practical sessions and interactive
+                  materials for the course.
+                </p>
+              </div>
+            </header>
+
+            <main>
+              <h2 class="section-title">Course programme</h2>
+              {cards if cards else "<p>Materials are coming soon.</p>"}
+            </main>
+
+            <footer>
+              DEEP LEARNING & KNOWLEDGE ANALYSIS · COURSE MATERIALS
+            </footer>
+          </body>
+          </html>
+          '''
 
           (root / "index.html").write_text(
-              "\n".join(html),
-              encoding="utf-8"
+              document, encoding="utf-8"
           )
 
-          print(f"Generated index with {len(files)} pages")
+          print(f"Generated course page with {len(files)} HTML files")
           PY
-
-      - name: Debug files
-        run: find dist -type f -iname "*.html"
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
