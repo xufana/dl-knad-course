@@ -1,14 +1,51 @@
 
+name: Deploy Course Website
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      # 1. Download repository
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Configure GitHub Pages
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      # 3. Prepare website
       - name: Prepare site
         run: |
           mkdir -p dist
 
+          # Copy all repository files
           rsync -a \
             --exclude='.git' \
             --exclude='.github' \
             --exclude='dist' \
             ./ dist/
 
+          # Generate homepage
           python3 - <<'PY'
           from pathlib import Path
           from html import escape
@@ -17,21 +54,32 @@
           root = Path("dist")
 
           files = sorted(
-              p for p in root.rglob("*.html")
-              if p.relative_to(root).as_posix() != "index.html"
+              p for p in root.rglob("*")
+              if p.is_file()
+              and p.suffix.lower() == ".html"
+              and p.relative_to(root).as_posix() != "index.html"
           )
 
           groups = {}
+
           for file in files:
               folder = file.parent.as_posix()
+
               if folder == ".":
                   folder = "Materials"
+
               groups.setdefault(folder, []).append(file)
 
           def folder_title(folder):
-              match = re.search(r'week[_ -]?(\d+)', folder, re.I)
+              match = re.search(
+                  r'week[_ -]?(\d+)',
+                  folder,
+                  re.IGNORECASE
+              )
+
               if match:
                   return f"Week {int(match.group(1)):02d}"
+
               return folder.replace("_", " ").replace("-", " ").title()
 
           def page_title(file):
@@ -40,48 +88,66 @@
           cards = ""
 
           for folder, pages in sorted(groups.items()):
-              cards += f'''
+
+              cards += f"""
               <section class="week">
                 <div class="week-head">
-                  <span class="week-number">{escape(folder_title(folder))}</span>
-                  <span class="count">{len(pages)} materials</span>
+                  <span class="week-number">
+                    {escape(folder_title(folder))}
+                  </span>
+                  <span class="count">
+                    {len(pages)} materials
+                  </span>
                 </div>
+
                 <div class="links">
-              '''
+              """
 
               for page in pages:
                   url = "./" + page.relative_to(root).as_posix()
                   name = page_title(page)
 
-                  cards += f'''
-                  <a class="material" href="{escape(url, quote=True)}">
+                  cards += f"""
+                  <a class="material"
+                     href="{escape(url, quote=True)}">
+
                     <span class="file-icon">↗</span>
                     <span>{escape(name)}</span>
                     <span class="arrow">→</span>
-                  </a>
-                  '''
 
-              cards += '''
+                  </a>
+                  """
+
+              cards += """
                 </div>
               </section>
-              '''
+              """
 
-          document = f'''<!DOCTYPE html>
+          document = f"""<!DOCTYPE html>
           <html lang="en">
+
           <head>
             <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
+
+            <meta name="viewport"
+                  content="width=device-width, initial-scale=1">
+
+            <meta name="description"
+                  content="Deep Learning and Knowledge Analysis course materials">
+
             <title>Deep Learning & Knowledge Analysis</title>
 
             <style>
-              * {{ box-sizing: border-box; }}
+              * {{
+                box-sizing: border-box;
+              }}
 
               body {{
                 margin: 0;
                 background: #f5f6fa;
                 color: #172033;
-                font-family: Inter, -apple-system, BlinkMacSystemFont,
-                             "Segoe UI", sans-serif;
+                font-family: Inter, -apple-system,
+                  BlinkMacSystemFont, "Segoe UI", sans-serif;
                 line-height: 1.6;
               }}
 
@@ -205,40 +271,82 @@
               }}
 
               @media(max-width: 600px) {{
-                .hero {{ padding: 55px 22px 65px; }}
-                main {{ padding: 35px 16px; }}
-                .week {{ padding: 18px; }}
+                .hero {{
+                  padding: 55px 22px 65px;
+                }}
+
+                main {{
+                  padding: 35px 16px;
+                }}
+
+                .week {{
+                  padding: 18px;
+                }}
               }}
             </style>
           </head>
 
           <body>
+
             <header class="hero">
               <div class="hero-inner">
-                <div class="tag">Course materials · 2026</div>
-                <h1>Deep Learning & Knowledge Analysis</h1>
+
+                <div class="tag">
+                  Course materials · 2026
+                </div>
+
+                <h1>
+                  Deep Learning & Knowledge Analysis
+                </h1>
+
                 <p class="subtitle">
-                  Lecture notes, practical sessions and interactive
-                  materials for the course.
+                  Lecture notes, practical sessions and
+                  interactive materials for the course.
                 </p>
+
               </div>
             </header>
 
             <main>
-              <h2 class="section-title">Course programme</h2>
+
+              <h2 class="section-title">
+                Course programme
+              </h2>
+
               {cards if cards else "<p>Materials are coming soon.</p>"}
+
             </main>
 
             <footer>
-              DEEP LEARNING & KNOWLEDGE ANALYSIS · COURSE MATERIALS
+              DEEP LEARNING & KNOWLEDGE ANALYSIS
+              · COURSE MATERIALS
             </footer>
+
           </body>
           </html>
-          '''
+          """
 
           (root / "index.html").write_text(
-              document, encoding="utf-8"
+              document,
+              encoding="utf-8"
           )
 
-          print(f"Generated course page with {len(files)} HTML files")
-          PY
+          print(f"Found {len(files)} HTML files")
+          print(f"Generated {len(groups)} course sections")
+
+      # 4. Check published files
+      - name: Debug published files
+        run: |
+          echo "HTML files:"
+          find dist -type f -iname "*.html"
+
+      # 5. Upload website
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      # 6. Deploy website
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
